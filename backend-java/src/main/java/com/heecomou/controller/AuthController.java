@@ -1,11 +1,14 @@
 package com.heecomou.controller;
 
+import com.heecomou.exception.BusinessException;
 import com.heecomou.model.dto.ApiResponse;
 import com.heecomou.model.dto.LoginRequest;
 import com.heecomou.model.dto.LoginResponse;
+import com.heecomou.model.dto.RefreshRequest;
 import com.heecomou.model.dto.RegisterRequest;
 import com.heecomou.model.vo.UserVO;
 import com.heecomou.security.JwtUtil;
+import com.heecomou.security.RefreshTokenService;
 import com.heecomou.security.TokenBlacklistService;
 import com.heecomou.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,11 +26,15 @@ public class AuthController {
     private final UserService userService;
     private final JwtUtil jwtUtil;
     private final TokenBlacklistService blacklistService;
+    private final RefreshTokenService refreshTokenService;
 
-    public AuthController(UserService userService, JwtUtil jwtUtil, TokenBlacklistService blacklistService) {
+    public AuthController(UserService userService, JwtUtil jwtUtil,
+                          TokenBlacklistService blacklistService,
+                          RefreshTokenService refreshTokenService) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
         this.blacklistService = blacklistService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @PostMapping("/register")
@@ -38,9 +45,43 @@ public class AuthController {
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        String token = userService.login(request);
+        String accessToken = userService.login(request);
         UserVO userVO = userService.getByUsername(request.getUsername());
-        return ApiResponse.success(LoginResponse.of(token, userVO));
+
+        String refreshToken = jwtUtil.generateRefreshToken(userVO.getId(), userVO.getUsername());
+        long refreshTtl = jwtUtil.getRemainingTtl(refreshToken);
+        refreshTokenService.save(refreshToken, userVO.getId(), refreshTtl);
+
+        long expiresIn = jwtUtil.getRemainingTtl(accessToken);
+        return ApiResponse.success(LoginResponse.of(accessToken, refreshToken, expiresIn, userVO));
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<LoginResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        String refreshToken = request.getRefreshToken();
+
+        if (!jwtUtil.validateRefreshToken(refreshToken)) {
+            throw new BusinessException(401, "refreshToken 无效或已过期");
+        }
+
+        Long userId = jwtUtil.getUserIdFromToken(refreshToken);
+        String username = jwtUtil.getUsernameFromToken(refreshToken);
+
+        if (!refreshTokenService.isValid(refreshToken, userId)) {
+            throw new BusinessException(401, "refreshToken 已失效，请重新登录");
+        }
+
+        String newAccessToken = jwtUtil.generateToken(userId, username);
+        String newRefreshToken = jwtUtil.generateRefreshToken(userId, username);
+
+        refreshTokenService.revoke(refreshToken, userId);
+
+        long newRefreshTtl = jwtUtil.getRemainingTtl(newRefreshToken);
+        refreshTokenService.save(newRefreshToken, userId, newRefreshTtl);
+
+        UserVO userVO = userService.getByUsername(username);
+        long expiresIn = jwtUtil.getRemainingTtl(newAccessToken);
+        return ApiResponse.success(LoginResponse.of(newAccessToken, newRefreshToken, expiresIn, userVO));
     }
 
     @PostMapping("/logout")

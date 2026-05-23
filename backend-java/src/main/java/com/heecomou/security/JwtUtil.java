@@ -1,5 +1,6 @@
 package com.heecomou.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,52 +15,60 @@ public class JwtUtil {
 
     private final SecretKey key;
     private final long expiration;
+    private final long refreshExpiration;
 
     public JwtUtil(@Value("${jwt.secret}") String secret,
-                   @Value("${jwt.expiration}") long expiration) {
+                   @Value("${jwt.expiration}") long expiration,
+                   @Value("${jwt.refresh-expiration}") long refreshExpiration) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expiration = expiration;
+        this.refreshExpiration = refreshExpiration;
     }
 
     public String generateToken(Long userId, String username) {
-        Date now = new Date();
-        Date expiry = new Date(now.getTime() + expiration);
+        return buildToken(userId, username, expiration, null);
+    }
 
-        return Jwts.builder()
+    public String generateRefreshToken(Long userId, String username) {
+        return buildToken(userId, username, refreshExpiration, "refresh");
+    }
+
+    private String buildToken(Long userId, String username, long ttlMillis, String type) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + ttlMillis);
+
+        var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("username", username)
                 .issuedAt(now)
-                .expiration(expiry)
-                .signWith(key)
-                .compact();
+                .expiration(expiry);
+
+        if (type != null) {
+            builder.claim("type", type);
+        }
+
+        return builder.signWith(key).compact();
+    }
+
+    public boolean isRefreshToken(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            return "refresh".equals(claims.get("type", String.class));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public Long getUserIdFromToken(String token) {
-        String subject = Jwts.parser()
-                .verifyWith(key)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
-        return Long.parseLong(subject);
+        return Long.parseLong(parseClaims(token).getSubject());
     }
 
     public String getUsernameFromToken(String token) {
-        return Jwts.parser()
-                .verifyWith(key)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .get("username", String.class);
+        return parseClaims(token).get("username", String.class);
     }
 
     public Date getExpirationFromToken(String token) {
-        return Jwts.parser()
-                .verifyWith(key)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .getExpiration();
+        return parseClaims(token).getExpiration();
     }
 
     public long getRemainingTtl(String token) {
@@ -69,13 +78,28 @@ public class JwtUtil {
 
     public boolean validateToken(String token) {
         try {
-            Jwts.parser()
-                    .verifyWith(key)
-                    .build()
-                    .parseSignedClaims(token);
-            return true;
+            Claims claims = parseClaims(token);
+            String type = claims.get("type", String.class);
+            return type == null || !"refresh".equals(type);
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public boolean validateRefreshToken(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            return "refresh".equals(claims.get("type", String.class));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 }

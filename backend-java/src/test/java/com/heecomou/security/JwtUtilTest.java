@@ -15,7 +15,7 @@ class JwtUtilTest {
 
     @BeforeEach
     void setUp() {
-        jwtUtil = new JwtUtil("test_secret_key_for_jwt_unit_test_min_32chars", 3600000L);
+        jwtUtil = new JwtUtil("test_secret_key_for_jwt_unit_test_min_32chars", 300000L, 3600000L);
     }
 
     @Test
@@ -59,7 +59,7 @@ class JwtUtilTest {
     @Test
     @DisplayName("不同 secret 签发的 Token 验证失败")
     void shouldRejectTokenWithDifferentSecret() {
-        JwtUtil otherJwtUtil = new JwtUtil("another_secret_key_for_testing_purposes_min32", 3600000L);
+        JwtUtil otherJwtUtil = new JwtUtil("another_secret_key_for_testing_purposes_min32", 300000L, 3600000L);
         String token = otherJwtUtil.generateToken(1L, "testuser");
         assertFalse(jwtUtil.validateToken(token));
     }
@@ -79,6 +79,42 @@ class JwtUtilTest {
         String token = jwtUtil.generateToken(1L, "testuser");
         long ttl = jwtUtil.getRemainingTtl(token);
         assertTrue(ttl > 0);
-        assertTrue(ttl <= 3600000L);
+        assertTrue(ttl <= 300000L);
+    }
+
+    @Test
+    @DisplayName("生成 refresh_token 包含 type=refresh 声明")
+    void shouldGenerateRefreshTokenWithTypeClaim() {
+        String refreshToken = jwtUtil.generateRefreshToken(1L, "testuser");
+        assertNotNull(refreshToken);
+        assertTrue(jwtUtil.isRefreshToken(refreshToken));
+    }
+
+    @Test
+    @DisplayName("access_token 不被识别为 refresh_token")
+    void shouldNotIdentifyAccessTokenAsRefreshToken() {
+        String accessToken = jwtUtil.generateToken(1L, "testuser");
+        assertFalse(jwtUtil.isRefreshToken(accessToken));
+    }
+
+    @Test
+    @DisplayName("验证 refresh_token 通过 validateRefreshToken")
+    void shouldValidateRefreshToken() {
+        String refreshToken = jwtUtil.generateRefreshToken(1L, "testuser");
+        assertTrue(jwtUtil.validateRefreshToken(refreshToken));
+    }
+
+    @Test
+    @DisplayName("access_token 不通过 validateRefreshToken")
+    void shouldRejectAccessTokenAsRefreshToken() {
+        String accessToken = jwtUtil.generateToken(1L, "testuser");
+        assertFalse(jwtUtil.validateRefreshToken(accessToken));
+    }
+
+    @Test
+    @DisplayName("refresh_token 不通过 validateToken（访问令牌校验）")
+    void shouldRejectRefreshTokenAsAccessToken() {
+        String refreshToken = jwtUtil.generateRefreshToken(1L, "testuser");
+        assertFalse(jwtUtil.validateToken(refreshToken));
     }
 }

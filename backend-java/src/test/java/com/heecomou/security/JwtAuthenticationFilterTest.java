@@ -23,7 +23,7 @@ class JwtAuthenticationFilterTest {
 
     @BeforeEach
     void setUp() {
-        jwtUtil = new JwtUtil("test_secret_key_for_jwt_filter_test_min32chars", 3600000L);
+        jwtUtil = new JwtUtil("test_secret_key_for_jwt_filter_test_min32chars", 300000L, 3600000L);
         blacklistService = mock(TokenBlacklistService.class);
         filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
         SecurityContextHolder.clearContext();

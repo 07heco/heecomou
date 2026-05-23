@@ -24,7 +24,7 @@ class SecurityConfigTest {
 
     @BeforeEach
     void setUp() {
-        jwtUtil = new JwtUtil("test_secret_key_for_security_config_test_min32", 3600000L);
+        jwtUtil = new JwtUtil("test_secret_key_for_security_config_test_min32", 300000L, 3600000L);
         TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
         jwtFilter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
         securityConfig = new SecurityConfig(jwtFilter);
