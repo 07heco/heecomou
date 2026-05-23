@@ -1,6 +1,7 @@
 package com.heecomou.handler;
 
 import com.heecomou.exception.BusinessException;
+import com.heecomou.exception.RateLimitException;
 import com.heecomou.model.dto.ApiResponse;
 
 import org.slf4j.Logger;
@@ -18,6 +19,13 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(RateLimitException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ApiResponse<Void> handleRateLimitException(RateLimitException ex) {
+        log.warn("限流触发: {}", ex.getMessage());
+        return ApiResponse.error(429, ex.getMessage());
+    }
 
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(HttpStatus.OK)

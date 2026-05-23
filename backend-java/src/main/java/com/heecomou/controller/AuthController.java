@@ -1,5 +1,6 @@
 package com.heecomou.controller;
 
+import com.heecomou.annotation.RateLimit;
 import com.heecomou.exception.BusinessException;
 import com.heecomou.model.dto.ApiResponse;
 import com.heecomou.model.dto.LoginRequest;
@@ -37,12 +38,14 @@ public class AuthController {
         this.refreshTokenService = refreshTokenService;
     }
 
+    @RateLimit(key = "register", capacity = 10, rate = 10, seconds = 60)
     @PostMapping("/register")
     public ApiResponse<UserVO> register(@Valid @RequestBody RegisterRequest request) {
         UserVO userVO = userService.register(request);
         return ApiResponse.success(userVO);
     }
 
+    @RateLimit(key = "login", capacity = 10, rate = 10, seconds = 60)
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         String accessToken = userService.login(request);
