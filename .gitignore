@@ -1,0 +1,105 @@
+# ===== OS =====
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.iml
+*.ipr
+*.iws
+
+# ===== Go =====
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+/vendor/
+gateway-go/bin/
+
+# ===== Java / Maven =====
+**/target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.log
+*.tmp
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+*.egg-info/
+dist/
+build/
+*.egg
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+
+# ===== Android / Gradle =====
+.gradle/
+/build/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.externalNativeBuild/
+.cxx/
+
+# ===== Node (if any) =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== Docker =====
+docker-compose.override.yml
+
+# ===== Secrets / Env =====
+.env
+.env.local
+*.pem
+*.key
+secrets/
+credentials/
+
+# ===== Large model files (uploaded separately) =====
+*.onnx
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+!scripts/test-audio/*.wav
+
+# ===== Misc =====
+*.zip
+*.tar.gz
+*.rar
+.DS_Store
