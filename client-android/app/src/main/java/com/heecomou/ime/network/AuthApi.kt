@@ -3,6 +3,7 @@ package com.heecomou.ime.network
 import com.heecomou.ime.model.ApiResponse
 import com.heecomou.ime.model.LoginRequest
 import com.heecomou.ime.model.LoginResponseData
+import com.heecomou.ime.model.RefreshRequest
 import com.heecomou.ime.model.RegisterRequest
 import com.heecomou.ime.model.UserVO
 import retrofit2.http.Body
@@ -15,4 +16,7 @@ interface AuthApi {
 
     @POST("api/v1/auth/register")
     suspend fun register(@Body request: RegisterRequest): ApiResponse<UserVO>
+
+    @POST("api/v1/auth/refresh")
+    suspend fun refresh(@Body request: RefreshRequest): ApiResponse<LoginResponseData>
 }

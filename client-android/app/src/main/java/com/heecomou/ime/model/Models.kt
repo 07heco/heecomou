@@ -20,9 +20,16 @@ data class RegisterRequest(
 )
 
 data class LoginResponseData(
-    val token: String,
+    @SerializedName("accessToken") val accessToken: String,
+    @SerializedName("refreshToken") val refreshToken: String,
+    @SerializedName("tokenType") val tokenType: String?,
+    @SerializedName("expiresIn") val expiresIn: Long,
     @SerializedName("userId") val userId: Long,
     val username: String
+)
+
+data class RefreshRequest(
+    val refreshToken: String
 )
 
 data class UserVO(

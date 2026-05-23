@@ -54,7 +54,8 @@ class LoginActivity : AppCompatActivity() {
                     btnLogin.isEnabled = true
 
                     if (response.code == 200 && response.data != null) {
-                        TokenManager.token = response.data.token
+                        val data = response.data!!
+                        TokenManager.saveTokens(data.accessToken, data.refreshToken)
                         Toast.makeText(this@LoginActivity, "登录成功", Toast.LENGTH_SHORT).show()
                         finish()
                     } else {
