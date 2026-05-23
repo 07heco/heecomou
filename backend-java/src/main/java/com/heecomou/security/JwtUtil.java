@@ -44,6 +44,15 @@ public class JwtUtil {
         return Long.parseLong(subject);
     }
 
+    public String getUsernameFromToken(String token) {
+        return Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get("username", String.class);
+    }
+
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
