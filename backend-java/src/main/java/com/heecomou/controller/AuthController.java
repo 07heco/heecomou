@@ -1,5 +1,7 @@
 package com.heecomou.controller;
 
+import com.heecomou.model.dto.LoginRequest;
+import com.heecomou.model.dto.LoginResponse;
 import com.heecomou.model.dto.RegisterRequest;
 import com.heecomou.model.vo.UserVO;
 import com.heecomou.service.UserService;
@@ -22,5 +24,12 @@ public class AuthController {
     @PostMapping("/register")
     public UserVO register(@Valid @RequestBody RegisterRequest request) {
         return userService.register(request);
+    }
+
+    @PostMapping("/login")
+    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
+        String token = userService.login(request);
+        UserVO userVO = userService.getByUsername(request.getUsername());
+        return LoginResponse.of(token, userVO);
     }
 }
