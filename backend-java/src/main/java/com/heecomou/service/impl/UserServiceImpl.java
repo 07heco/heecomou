@@ -1,6 +1,7 @@
 package com.heecomou.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.heecomou.exception.BusinessException;
 import com.heecomou.mapper.UserMapper;
 import com.heecomou.model.dto.LoginRequest;
 import com.heecomou.model.dto.RegisterRequest;
@@ -29,7 +30,7 @@ public class UserServiceImpl implements UserService {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getUsername, request.getUsername());
         if (userMapper.selectCount(wrapper) > 0) {
-            throw new RuntimeException("用户名已存在");
+            throw new BusinessException(409, "用户名已存在");
         }
 
         User user = new User();
@@ -50,11 +51,11 @@ public class UserServiceImpl implements UserService {
         User user = userMapper.selectOne(wrapper);
 
         if (user == null) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BusinessException(401, "用户名或密码错误");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BusinessException(401, "用户名或密码错误");
         }
 
         return jwtUtil.generateToken(user.getId(), user.getUsername());
@@ -66,7 +67,7 @@ public class UserServiceImpl implements UserService {
         wrapper.eq(User::getUsername, username);
         User user = userMapper.selectOne(wrapper);
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(404, "用户不存在");
         }
         return UserVO.from(user);
     }
