@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HeecoMou</string>
+    <string name="login_title">登录</string>
+    <string name="username_hint">用户名</string>
+    <string name="password_hint">密码</string>
+    <string name="login_button">登录</string>
+    <string name="login_success">登录成功</string>
+    <string name="login_failed">登录失败</string>
+</resources>
