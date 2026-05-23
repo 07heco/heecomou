@@ -4,6 +4,10 @@ spring:
     username: root
     password: heecomou123
     driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
   data:
     redis:
       host: localhost
@@ -11,6 +15,10 @@ spring:
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
 
 jwt:
   secret: heecomou_jwt_secret_dev_only
