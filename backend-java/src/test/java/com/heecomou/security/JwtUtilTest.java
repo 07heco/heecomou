@@ -4,6 +4,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Date;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("JwtUtil 单元测试")
@@ -60,5 +62,23 @@ class JwtUtilTest {
         JwtUtil otherJwtUtil = new JwtUtil("another_secret_key_for_testing_purposes_min32", 3600000L);
         String token = otherJwtUtil.generateToken(1L, "testuser");
         assertFalse(jwtUtil.validateToken(token));
+    }
+
+    @Test
+    @DisplayName("getExpirationFromToken 返回过期时间")
+    void shouldGetExpirationFromToken() {
+        String token = jwtUtil.generateToken(1L, "testuser");
+        Date expiration = jwtUtil.getExpirationFromToken(token);
+        assertNotNull(expiration);
+        assertTrue(expiration.after(new Date()));
+    }
+
+    @Test
+    @DisplayName("getRemainingTtl 返回剩余有效时长（毫秒）")
+    void shouldReturnRemainingTtl() {
+        String token = jwtUtil.generateToken(1L, "testuser");
+        long ttl = jwtUtil.getRemainingTtl(token);
+        assertTrue(ttl > 0);
+        assertTrue(ttl <= 3600000L);
     }
 }

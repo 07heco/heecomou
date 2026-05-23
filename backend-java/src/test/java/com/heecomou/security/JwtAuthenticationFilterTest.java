@@ -18,12 +18,14 @@ import static org.mockito.Mockito.*;
 class JwtAuthenticationFilterTest {
 
     private JwtUtil jwtUtil;
+    private TokenBlacklistService blacklistService;
     private JwtAuthenticationFilter filter;
 
     @BeforeEach
     void setUp() {
         jwtUtil = new JwtUtil("test_secret_key_for_jwt_filter_test_min32chars", 3600000L);
-        filter = new JwtAuthenticationFilter(jwtUtil);
+        blacklistService = mock(TokenBlacklistService.class);
+        filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
         SecurityContextHolder.clearContext();
     }
 
@@ -52,6 +54,7 @@ class JwtAuthenticationFilterTest {
         FilterChain filterChain = mock(FilterChain.class);
 
         when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+        when(blacklistService.isBlacklisted(token)).thenReturn(false);
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -92,5 +95,24 @@ class JwtAuthenticationFilterTest {
         filter.doFilterInternal(request, response, filterChain);
 
         verify(filterChain, times(1)).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("黑名单中的 Token 返回 401 并拦截")
+    void shouldReturn401ForBlacklistedToken() throws Exception {
+        String token = jwtUtil.generateToken(1L, "testuser");
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain filterChain = mock(FilterChain.class);
+
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+        when(blacklistService.isBlacklisted(token)).thenReturn(true);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertEquals(HttpServletResponse.SC_UNAUTHORIZED, response.getStatus());
+        assertTrue(response.getContentAsString().contains("Token 已失效"));
+        verify(filterChain, never()).doFilter(any(), any());
     }
 }

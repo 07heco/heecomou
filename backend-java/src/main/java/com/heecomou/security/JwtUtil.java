@@ -53,6 +53,20 @@ public class JwtUtil {
                 .get("username", String.class);
     }
 
+    public Date getExpirationFromToken(String token) {
+        return Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getExpiration();
+    }
+
+    public long getRemainingTtl(String token) {
+        Date expiration = getExpirationFromToken(token);
+        return Math.max(0, expiration.getTime() - System.currentTimeMillis());
+    }
+
     public boolean validateToken(String token) {
         try {
             Jwts.parser()

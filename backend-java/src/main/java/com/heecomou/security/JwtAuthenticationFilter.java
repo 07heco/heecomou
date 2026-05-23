@@ -19,10 +19,12 @@ import jakarta.servlet.http.HttpServletResponse;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final TokenBlacklistService blacklistService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, TokenBlacklistService blacklistService) {
         this.jwtUtil = jwtUtil;
+        this.blacklistService = blacklistService;
     }
 
     @Override
@@ -39,6 +41,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (!jwtUtil.validateToken(token)) {
             sendErrorResponse(response, 401, "Token 无效或已过期");
+            return;
+        }
+
+        if (blacklistService.isBlacklisted(token)) {
+            sendErrorResponse(response, 401, "Token 已失效，请重新登录");
             return;
         }
 

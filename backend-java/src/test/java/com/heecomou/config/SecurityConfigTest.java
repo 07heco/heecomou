@@ -2,6 +2,7 @@ package com.heecomou.config;
 
 import com.heecomou.security.JwtAuthenticationFilter;
 import com.heecomou.security.JwtUtil;
+import com.heecomou.security.TokenBlacklistService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +13,7 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @DisplayName("SecurityConfig 单元测试")
 class SecurityConfigTest {
@@ -23,7 +25,8 @@ class SecurityConfigTest {
     @BeforeEach
     void setUp() {
         jwtUtil = new JwtUtil("test_secret_key_for_security_config_test_min32", 3600000L);
-        jwtFilter = new JwtAuthenticationFilter(jwtUtil);
+        TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
+        jwtFilter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
         securityConfig = new SecurityConfig(jwtFilter);
     }
 
