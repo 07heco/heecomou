@@ -6,24 +6,18 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
 
-@TableName("user")
+@TableName("`user`")
 public class User {
 
     @TableId(type = IdType.AUTO)
     private Long id;
-
     private String username;
-
+    private String nickname;
     private String passwordHash;
-
     private String email;
-
     private String phone;
-
     private String avatarUrl;
-
     private LocalDateTime createdAt;
-
     private LocalDateTime updatedAt;
 
     public Long getId() {
@@ -40,6 +34,14 @@ public class User {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
     }
 
     public String getPasswordHash() {
