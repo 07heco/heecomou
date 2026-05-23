@@ -15,6 +15,10 @@ object ApiClient {
         createRetrofit().create(AuthApi::class.java)
     }
 
+    val userApiService: UserApi by lazy {
+        createRetrofit().create(UserApi::class.java)
+    }
+
     private fun createRetrofit(): Retrofit {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
@@ -25,7 +29,11 @@ object ApiClient {
             TokenManager.token?.let { token ->
                 requestBuilder.addHeader("Authorization", "Bearer $token")
             }
-            chain.proceed(requestBuilder.build())
+            val response = chain.proceed(requestBuilder.build())
+            if (response.code == 401) {
+                TokenManager.clear()
+            }
+            response
         }
 
         val client = OkHttpClient.Builder()
