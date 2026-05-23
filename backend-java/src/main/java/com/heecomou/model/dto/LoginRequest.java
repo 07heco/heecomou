@@ -1,6 +1,7 @@
 package com.heecomou.model.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 public class LoginRequest {
 
@@ -8,6 +9,7 @@ public class LoginRequest {
     private String username;
 
     @NotBlank(message = "密码不能为空")
+    @Size(min = 6, max = 30, message = "密码长度须在 6~30 之间")
     private String password;
 
     public String getUsername() {
