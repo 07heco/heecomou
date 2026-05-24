@@ -51,8 +51,9 @@ class VocabApiService(
     }
 
     fun sync(sinceVersion: Long = 0): ApiResponse<VocabSyncResponse>? {
-        val url = "$baseUrl/api/v1/vocabulary/sync?since_version=$sinceVersion"
-        return executeGet(url, object : TypeToken<ApiResponse<VocabSyncResponse>>() {})
+        val url = "$baseUrl/api/v1/vocabulary/sync"
+        val body = mapOf("version" to sinceVersion, "limit" to 500)
+        return executePost(url, body, object : TypeToken<ApiResponse<VocabSyncResponse>>() {})
     }
 
     private inline fun <reified T> executeGet(url: String, typeToken: TypeToken<T>): T? {
