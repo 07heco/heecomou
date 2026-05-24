@@ -27,6 +27,10 @@ object ApiClient {
         createRetrofit().create(UserApi::class.java)
     }
 
+    val vocabApiService: VocabApi by lazy {
+        createRetrofit().create(VocabApi::class.java)
+    }
+
     private fun createRetrofit(): Retrofit {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
