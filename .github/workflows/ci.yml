@@ -67,14 +67,12 @@ jobs:
   desktop-test:
     name: Desktop Build & Test
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: client-desktop
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           java-version: "17"
           distribution: "temurin"
-      - run: chmod +x ../client-android/gradlew
-      - run: ../client-android/gradlew test --no-daemon -Dkotlin.compiler.execution.strategy=in-process
+      - run: |
+          chmod +x client-android/gradlew
+          cd client-android && ./gradlew -p ../client-desktop test --no-daemon -Dkotlin.compiler.execution.strategy=in-process
