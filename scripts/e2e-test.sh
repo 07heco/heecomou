@@ -305,9 +305,11 @@ assert_code "删除词汇" 200 \
     -H "Authorization: Bearer $ACCESS_TOKEN"
 
 # 3.8 增量同步
-BODY=$(assert_code "增量同步 (since_version=0)" 200 \
-    -X GET "$BACKEND_URL/api/v1/vocabulary/sync?since_version=0" \
-    -H "Authorization: Bearer $ACCESS_TOKEN")
+BODY=$(assert_code "增量同步 (version=0)" 200 \
+    -X POST "$BACKEND_URL/api/v1/vocabulary/sync" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -d '{"version":0,"limit":50}')
 assert_json_contains "增量同步返回 items" "$BODY" "items"
 
 ##############################################################################
@@ -330,9 +332,9 @@ assert_code "提交纠错记录 - 键盘输入" 200 \
 
 # 4.2 获取最近纠错
 BODY=$(assert_code "获取最近纠错记录" 200 \
-    -X GET "$BACKEND_URL/api/v1/corrections/recent?limit=10" \
+    -X GET "$BACKEND_URL/api/v1/corrections?limit=10" \
     -H "Authorization: Bearer $ACCESS_TOKEN")
-assert_json_contains "纠错记录包含 items" "$BODY" "items"
+assert_json_contains "纠错记录包含 data" "$BODY" "data"
 
 ##############################################################################
 # 5. Gateway 智能路由 API
