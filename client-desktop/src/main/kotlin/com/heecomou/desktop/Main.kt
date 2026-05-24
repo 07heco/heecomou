@@ -5,6 +5,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 
@@ -52,7 +56,9 @@ fun main() = application {
     )
 }
 
-object TrayIcon : androidx.compose.ui.graphics.painter.Painter() {
-    override val intrinsicSize = androidx.compose.ui.geometry.Size(16f, 16f)
-    override fun DrawScope.draw(painter: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit) {}
+object TrayIcon : Painter() {
+    override val intrinsicSize = Size(16f, 16f)
+    override fun DrawScope.onDraw() {
+        drawCircle(Color(0xFF4A90D9), radius = 7f)
+    }
 }
