@@ -5,6 +5,7 @@ import logging
 import grpc
 
 from inference.engine import ASREngine
+from nlp.punctuator import restore_punctuation
 from asr_grpc.asr_service_pb2 import (
     RecognitionResult,
     HealthResponse,
@@ -44,8 +45,14 @@ class ASRServicer(ASRServiceServicer):
 
             result = self.engine.recognize(audio_b64, language=language)
 
+            final_text = result.text
+            try:
+                final_text = restore_punctuation(final_text)
+            except Exception:
+                pass
+
             yield RecognitionResult(
-                text=result.text,
+                text=final_text,
                 is_final=True,
                 duration_ms=result.duration_ms,
             )
