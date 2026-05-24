@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/07heco/heecomou/gateway-go/internal/asr"
+	"github.com/07heco/heecomou/gateway-go/internal/router"
 	"github.com/07heco/heecomou/gateway-go/internal/websocket"
 )
 
@@ -31,7 +32,11 @@ func main() {
 
 	audioHandler := websocket.NewAudioHandler(outputRoot, forwarder)
 
+	routeEngine := router.NewRuleEngine()
+	routeHandler := router.NewRouteHandler(routeEngine)
+
 	http.Handle("/ws/audio", audioHandler)
+	http.Handle("/api/v1/route", routeHandler)
 	http.HandleFunc("/health", handleHealth)
 
 	log.Printf("Gateway starting on :%s (audio output: %s, asr servers: %v)",
