@@ -2,10 +2,12 @@ package com.heecomou.security;
 
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
+@Profile("!test")
 public class TokenBlacklistService {
 
     private static final String BLACKLIST_PREFIX = "token:blacklist:";

@@ -64,6 +64,7 @@ dmypy.json
 .gradle/
 /build/
 local.properties
+local-sdk/
 *.apk
 *.aab
 *.ap_
