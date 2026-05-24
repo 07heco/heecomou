@@ -1,6 +1,8 @@
 package websocket
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/binary"
@@ -126,6 +128,7 @@ func TestAudioHandlerIntegration(t *testing.T) {
 		t.Fatalf("Failed to connect: %v", err)
 	}
 	defer conn.Close()
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 
 	b := make([]byte, 16)
 	key := base64.StdEncoding.EncodeToString(b)[:24]
@@ -133,15 +136,17 @@ func TestAudioHandlerIntegration(t *testing.T) {
 	req := fmt.Sprintf("GET /ws/audio HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: %s\r\n\r\n", addr, key)
 	conn.Write([]byte(req))
 
-	respBuf := make([]byte, 1024)
-	n, _ := conn.Read(respBuf)
-	resp := string(respBuf[:n])
+	reader := bufio.NewReader(conn)
 
+	resp, err := readHTTPResponse(reader)
+	if err != nil {
+		t.Fatalf("Failed to read HTTP response: %v", err)
+	}
 	if !strings.Contains(resp, "101") {
-		t.Fatalf("Expected 101, got: %s", resp[:200])
+		t.Fatalf("Expected 101, got: %s", resp[:min(200, len(resp))])
 	}
 
-	op, payload, err := readWSFrame(conn)
+	op, payload, err := readWSFrame(reader)
 	if err != nil {
 		t.Fatalf("Failed to read session_started: %v", err)
 	}
@@ -163,7 +168,9 @@ func TestAudioHandlerIntegration(t *testing.T) {
 		t.Fatalf("Failed to write binary frame: %v", err)
 	}
 
-	op, payload, err = readWSFrame(conn)
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+
+	op, payload, err = readWSFrame(reader)
 	if err != nil {
 		t.Fatalf("Failed to read ack: %v", err)
 	}
@@ -245,6 +252,21 @@ func TestAudioHandlerNonWebSocket(t *testing.T) {
 	}
 }
 
+func readHTTPResponse(r *bufio.Reader) (string, error) {
+	var buf bytes.Buffer
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return buf.String(), err
+		}
+		buf.WriteString(line)
+		if line == "\r\n" {
+			break
+		}
+	}
+	return buf.String(), nil
+}
+
 func parseHeaders(headerPart string) map[string]string {
 	headers := make(map[string]string)
 	lines := strings.Split(headerPart, "\r\n")
@@ -292,9 +314,9 @@ func encodeWSLength(length int) []byte {
 	}
 }
 
-func readWSFrame(conn net.Conn) (int, []byte, error) {
+func readWSFrame(r io.Reader) (int, []byte, error) {
 	header := make([]byte, 2)
-	if _, err := io.ReadFull(conn, header); err != nil {
+	if _, err := io.ReadFull(r, header); err != nil {
 		return 0, nil, err
 	}
 	opcode := int(header[0] & 0x0F)
@@ -303,13 +325,13 @@ func readWSFrame(conn net.Conn) (int, []byte, error) {
 	switch {
 	case length == 126:
 		ext := make([]byte, 2)
-		if _, err := io.ReadFull(conn, ext); err != nil {
+		if _, err := io.ReadFull(r, ext); err != nil {
 			return 0, nil, err
 		}
 		length = int(binary.BigEndian.Uint16(ext))
 	case length == 127:
 		ext := make([]byte, 8)
-		if _, err := io.ReadFull(conn, ext); err != nil {
+		if _, err := io.ReadFull(r, ext); err != nil {
 			return 0, nil, err
 		}
 		length = int(binary.BigEndian.Uint64(ext))
@@ -317,7 +339,7 @@ func readWSFrame(conn net.Conn) (int, []byte, error) {
 
 	payload := make([]byte, length)
 	if length > 0 {
-		if _, err := io.ReadFull(conn, payload); err != nil {
+		if _, err := io.ReadFull(r, payload); err != nil {
 			return 0, nil, err
 		}
 	}
