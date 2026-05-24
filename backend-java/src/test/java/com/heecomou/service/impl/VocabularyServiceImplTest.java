@@ -3,6 +3,8 @@ package com.heecomou.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.heecomou.exception.BusinessException;
 import com.heecomou.mapper.VocabularyMapper;
+import com.heecomou.model.dto.VocabSyncRequest;
+import com.heecomou.model.dto.VocabSyncResponse;
 import com.heecomou.model.dto.VocabListResponse;
 import com.heecomou.model.dto.VocabRequest;
 import com.heecomou.model.entity.Vocabulary;
@@ -182,5 +184,64 @@ class VocabularyServiceImplTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> vocabularyService.getById(100L, 1L));
         assertEquals(404, ex.getCode());
+    }
+
+    @Test
+    void sync_returnsNewRecords() {
+        VocabSyncRequest req = new VocabSyncRequest();
+        req.setVersion(0L);
+
+        Vocabulary v1 = new Vocabulary();
+        v1.setId(1L); v1.setUserId(100L); v1.setWord("新词1");
+        v1.setVersion(100L);
+        Vocabulary v2 = new Vocabulary();
+        v2.setId(2L); v2.setUserId(100L); v2.setWord("新词2");
+        v2.setVersion(200L);
+
+        when(vocabularyMapper.selectList(any()))
+                .thenReturn(List.of(v1, v2));
+
+        VocabSyncResponse result = vocabularyService.sync(100L, req);
+
+        assertNotNull(result);
+        assertEquals(2, result.getItems().size());
+        assertFalse(result.isHasMore());
+        assertEquals(200L, result.getMaxVersion());
+    }
+
+    @Test
+    void sync_hasMoreWhenExceedsLimit() {
+        VocabSyncRequest req = new VocabSyncRequest();
+        req.setVersion(0L);
+        req.setLimit(2);
+
+        List<Vocabulary> records = new java.util.ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            Vocabulary v = new Vocabulary();
+            v.setId((long) i); v.setUserId(100L); v.setWord("w" + i);
+            v.setVersion((long) (i + 1) * 100);
+            records.add(v);
+        }
+
+        when(vocabularyMapper.selectList(any())).thenReturn(records);
+
+        VocabSyncResponse result = vocabularyService.sync(100L, req);
+
+        assertTrue(result.isHasMore());
+        assertEquals(2, result.getItems().size());
+    }
+
+    @Test
+    void sync_noNewData() {
+        VocabSyncRequest req = new VocabSyncRequest();
+        req.setVersion(999L);
+
+        when(vocabularyMapper.selectList(any())).thenReturn(List.of());
+
+        VocabSyncResponse result = vocabularyService.sync(100L, req);
+
+        assertTrue(result.getItems().isEmpty());
+        assertFalse(result.isHasMore());
+        assertEquals(999L, result.getMaxVersion().longValue());
     }
 }

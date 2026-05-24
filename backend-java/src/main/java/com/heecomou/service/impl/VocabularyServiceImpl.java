@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.heecomou.exception.BusinessException;
 import com.heecomou.mapper.VocabularyMapper;
+import com.heecomou.model.dto.VocabSyncRequest;
+import com.heecomou.model.dto.VocabSyncResponse;
 import com.heecomou.model.dto.VocabListResponse;
 import com.heecomou.model.dto.VocabRequest;
 import com.heecomou.model.entity.Vocabulary;
@@ -117,6 +119,29 @@ public class VocabularyServiceImpl implements VocabularyService {
             throw new BusinessException(404, "词汇不存在");
         }
         return VocabularyVO.from(v);
+    }
+
+    @Override
+    public VocabSyncResponse sync(Long userId, VocabSyncRequest request) {
+        LambdaQueryWrapper<Vocabulary> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Vocabulary::getUserId, userId)
+               .gt(Vocabulary::getVersion, request.getVersion())
+               .orderByAsc(Vocabulary::getVersion)
+               .last("LIMIT " + (request.getLimit() + 1));
+
+        List<Vocabulary> records = vocabularyMapper.selectList(wrapper);
+
+        boolean hasMore = records.size() > request.getLimit();
+        List<Vocabulary> page = hasMore ? records.subList(0, request.getLimit()) : records;
+
+        List<VocabularyVO> items = page.stream()
+                .map(VocabularyVO::from)
+                .toList();
+
+        Long maxVersion = items.isEmpty() ? request.getVersion() :
+                page.get(page.size() - 1).getVersion();
+
+        return new VocabSyncResponse(items, hasMore, maxVersion);
     }
 
     private void checkDuplicate(Long userId, String word) {

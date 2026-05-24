@@ -1,5 +1,7 @@
 package com.heecomou.service;
 
+import com.heecomou.model.dto.VocabSyncRequest;
+import com.heecomou.model.dto.VocabSyncResponse;
 import com.heecomou.model.dto.VocabListResponse;
 import com.heecomou.model.dto.VocabRequest;
 import com.heecomou.model.vo.VocabularyVO;
@@ -17,4 +19,6 @@ public interface VocabularyService {
     VocabListResponse search(Long userId, String keyword, int page, int size);
 
     VocabularyVO getById(Long userId, Long vocabId);
+
+    VocabSyncResponse sync(Long userId, VocabSyncRequest request);
 }

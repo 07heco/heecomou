@@ -2,6 +2,8 @@ package com.heecomou.controller;
 
 import com.heecomou.annotation.RateLimit;
 import com.heecomou.model.dto.ApiResponse;
+import com.heecomou.model.dto.VocabSyncRequest;
+import com.heecomou.model.dto.VocabSyncResponse;
 import com.heecomou.model.dto.VocabListResponse;
 import com.heecomou.model.dto.VocabRequest;
 import com.heecomou.model.vo.VocabularyVO;
@@ -74,6 +76,14 @@ public class VocabularyController {
         Long userId = extractUserId(request);
         VocabularyVO vo = vocabularyService.getById(userId, id);
         return ApiResponse.success(vo);
+    }
+
+    @PostMapping("/sync")
+    public ApiResponse<VocabSyncResponse> sync(HttpServletRequest request,
+                                                @Valid @RequestBody VocabSyncRequest req) {
+        Long userId = extractUserId(request);
+        VocabSyncResponse resp = vocabularyService.sync(userId, req);
+        return ApiResponse.success(resp);
     }
 
     private Long extractUserId(HttpServletRequest request) {
