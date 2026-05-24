@@ -6,9 +6,7 @@ import grpc
 
 from inference.engine import ASREngine
 from asr_grpc.asr_service_pb2 import (
-    AudioChunk,
     RecognitionResult,
-    HealthRequest,
     HealthResponse,
 )
 from asr_grpc.asr_service_pb2_grpc import (

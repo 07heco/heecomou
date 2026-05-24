@@ -65,7 +65,9 @@ class TestASRServicer:
 
     def test_pcm_to_wav_custom_params(self, servicer):
         pcm = _generate_pcm_samples(duration_ms=50, sample_rate=8000)
-        wav_bytes = servicer._pcm_to_wav(pcm, sample_rate=8000, num_channels=2, sample_width=1)
+        wav_bytes = servicer._pcm_to_wav(
+            pcm, sample_rate=8000, num_channels=2, sample_width=1
+        )
         buf = io.BytesIO(wav_bytes)
         with wave.open(buf, "rb") as wf:
             assert wf.getnchannels() == 2

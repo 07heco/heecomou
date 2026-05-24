@@ -71,9 +71,15 @@ class ASREngine:
         logger.info("Loading ASR model %s on %s...", self.model_id, self._device)
         start = time.time()
 
-        self._processor = AutoProcessor.from_pretrained(self.model_id, trust_remote_code=True)
+        self._processor = AutoProcessor.from_pretrained(
+            self.model_id, trust_remote_code=True
+        )
 
-        torch_dtype = torch.float16 if self._device.startswith("cuda") else torch.float32
+        torch_dtype = (
+            torch.float16
+            if self._device.startswith("cuda")
+            else torch.float32
+        )
         self._model = AutoModel.from_pretrained(
             self.model_id,
             torch_dtype=torch_dtype,
