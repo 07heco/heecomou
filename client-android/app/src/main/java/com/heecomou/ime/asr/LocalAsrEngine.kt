@@ -496,6 +496,25 @@ class LocalAsrEngine(private val context: Context) {
         }
     }
 
+    fun warmup() {
+        if (state != State.READY) return
+        val dummyAudio = FloatArray(SAMPLE_RATE) { 0.001f }
+        try {
+            extractLogMel(dummyAudio)
+        } catch (e: Exception) {
+            // warmup failure is non-fatal
+        }
+    }
+
+    fun getMemoryUsageEstimate(): Long {
+        return try {
+            val runtime = Runtime.getRuntime()
+            runtime.totalMemory() - runtime.freeMemory()
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
     fun release() {
         try {
             encoderSession?.close()
