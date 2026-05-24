@@ -11,6 +11,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
 import com.heecomou.ime.audio.AudioCaptureManager
+import com.heecomou.ime.audio.ClientVAD
 import com.heecomou.ime.network.asr.CloudAsrClient
 import com.heecomou.ime.ui.voice.VoiceInputPanel
 import com.heecomou.ime.ui.voice.VoiceInputState
@@ -31,6 +32,7 @@ class HeecoMouIME : InputMethodService() {
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private var isRecording = false
     private var stopRecordingTask: Runnable? = null
+    private var vad: ClientVAD? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -93,6 +95,8 @@ class HeecoMouIME : InputMethodService() {
         voiceButton.text = "停止"
         isRecording = true
 
+        vad = ClientVAD().apply { reset() }
+
         asrClient = CloudAsrClient()
         asrClient?.onSessionStarted = { session ->
             Log.d(TAG, "ASR session started: ${session.sessionId}")
@@ -105,7 +109,16 @@ class HeecoMouIME : InputMethodService() {
         asrClient?.connect()
 
         audioCapture.onAudioData = { pcmData ->
-            asrClient?.sendAudio(pcmData)
+            val shortSamples = ShortArray(pcmData.size / 2)
+            for (i in shortSamples.indices) {
+                val low = pcmData[i * 2].toInt() and 0xFF
+                val high = pcmData[i * 2 + 1].toInt() and 0xFF
+                shortSamples[i] = ((high shl 8) or low).toShort()
+            }
+            val hasSpeech = vad?.detect(shortSamples) ?: true
+            if (hasSpeech) {
+                asrClient?.sendAudio(pcmData)
+            }
         }
         audioCapture.onError = { error ->
             mainHandler.post {
