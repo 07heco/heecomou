@@ -77,4 +77,4 @@ jobs:
           java-version: "17"
           distribution: "temurin"
       - run: chmod +x gradlew
-      - run: ./gradlew test --no-daemon -Dkotlin.compiler.execution.strategy=in-process
+      - run: ./gradlew test --no-daemon -Djava.awt.headless=true

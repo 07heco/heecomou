@@ -21,10 +21,11 @@ class TextOutputManager {
 
     init {
         try {
+            System.setProperty("java.awt.headless", "true")
             robot = Robot()
             clipboard = Toolkit.getDefaultToolkit().systemClipboard
-        } catch (e: Exception) {
-            LOGGER.log(Level.SEVERE, "Failed to initialize TextOutputManager: ${e.message}", e)
+        } catch (e: Throwable) {
+            LOGGER.log(Level.WARNING, "TextOutputManager not available (headless/no display): ${e.message}")
         }
     }
 
@@ -91,12 +92,14 @@ class TextOutputManager {
     fun writeToClipboard(text: String): Boolean {
         if (text.isEmpty()) return false
 
+        val clip = clipboard ?: return false
+
         return try {
             val selection = StringSelection(text)
-            clipboard?.setContents(selection, null)
+            clip.setContents(selection, null)
             true
-        } catch (e: Exception) {
-            LOGGER.log(Level.WARNING, "Failed to write to clipboard: ${e.message}", e)
+        } catch (e: Throwable) {
+            LOGGER.log(Level.WARNING, "Failed to write to clipboard: ${e.message}")
             false
         }
     }

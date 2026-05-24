@@ -12,8 +12,27 @@ class GlobalHotkeyManager {
     companion object {
         private val LOGGER = Logger.getLogger(GlobalHotkeyManager::class.java.name)
 
-        private const val HOTKEY_KEY = NativeKeyEvent.VC_V
-        private const val CANCEL_KEY = NativeKeyEvent.VC_ESCAPE
+        private const val HOTKEY_KEY = 0x0056 // NativeKeyEvent.VC_V
+        private const val CANCEL_KEY = 0x001B // NativeKeyEvent.VC_ESCAPE
+        private const val VC_CONTROL = 0x0011 // NativeKeyEvent.VC_CONTROL
+        private const val VC_SHIFT = 0x0010   // NativeKeyEvent.VC_SHIFT
+
+        @Volatile
+        private var nativeHookAvailable: Boolean? = null
+
+        fun isNativeHookAvailable(): Boolean {
+            if (nativeHookAvailable != null) return nativeHookAvailable!!
+            nativeHookAvailable = try {
+                Class.forName("com.github.kwhat.jnativehook.GlobalScreen")
+                GlobalScreen.registerNativeHook()
+                GlobalScreen.unregisterNativeHook()
+                true
+            } catch (_: Throwable) {
+                LOGGER.info("JNativeHook not available, running in headless/CI mode")
+                false
+            }
+            return nativeHookAvailable!!
+        }
     }
 
     private val registered = AtomicBoolean(false)
@@ -23,29 +42,38 @@ class GlobalHotkeyManager {
     var onHotkeyTriggered: (() -> Unit)? = null
     var onCancelTriggered: (() -> Unit)? = null
 
-    private val keyListener = object : NativeKeyListener {
-        override fun nativeKeyPressed(e: NativeKeyEvent) {
-            when (e.keyCode) {
-                NativeKeyEvent.VC_CONTROL -> ctrlPressed.set(true)
-                NativeKeyEvent.VC_SHIFT -> shiftPressed.set(true)
-                CANCEL_KEY -> {
-                    if (registered.get()) {
-                        onCancelTriggered?.invoke()
-                    }
-                }
-                HOTKEY_KEY -> {
-                    if (ctrlPressed.get() && shiftPressed.get()) {
-                        onHotkeyTriggered?.invoke()
-                    }
-                }
-            }
-        }
+    private var keyListener: NativeKeyListener? = null
 
-        override fun nativeKeyReleased(e: NativeKeyEvent) {
-            when (e.keyCode) {
-                NativeKeyEvent.VC_CONTROL -> ctrlPressed.set(false)
-                NativeKeyEvent.VC_SHIFT -> shiftPressed.set(false)
+    private fun createKeyListener(): NativeKeyListener? {
+        if (!isNativeHookAvailable()) return null
+        return try {
+            object : NativeKeyListener {
+                override fun nativeKeyPressed(e: NativeKeyEvent) {
+                    when (e.keyCode) {
+                        VC_CONTROL -> ctrlPressed.set(true)
+                        VC_SHIFT -> shiftPressed.set(true)
+                        CANCEL_KEY -> {
+                            if (registered.get()) {
+                                onCancelTriggered?.invoke()
+                            }
+                        }
+                        HOTKEY_KEY -> {
+                            if (ctrlPressed.get() && shiftPressed.get()) {
+                                onHotkeyTriggered?.invoke()
+                            }
+                        }
+                    }
+                }
+
+                override fun nativeKeyReleased(e: NativeKeyEvent) {
+                    when (e.keyCode) {
+                        VC_CONTROL -> ctrlPressed.set(false)
+                        VC_SHIFT -> shiftPressed.set(false)
+                    }
+                }
             }
+        } catch (_: Throwable) {
+            null
         }
     }
 
@@ -55,15 +83,27 @@ class GlobalHotkeyManager {
             return true
         }
 
+        if (!isNativeHookAvailable()) {
+            LOGGER.info("Native hook not available, skip registration")
+            return false
+        }
+
+        val listener = keyListener ?: createKeyListener()
+        if (listener == null) {
+            LOGGER.warning("Failed to create key listener")
+            return false
+        }
+        keyListener = listener
+
         return try {
             Logger.getLogger("com.github.kwhat.jnativehook").level = Level.OFF
             GlobalScreen.registerNativeHook()
-            GlobalScreen.addNativeKeyListener(keyListener)
+            GlobalScreen.addNativeKeyListener(listener)
             registered.set(true)
             LOGGER.info("Global hotkey registered: Ctrl+Shift+V (trigger), Esc (cancel)")
             true
-        } catch (e: Exception) {
-            LOGGER.log(Level.SEVERE, "Failed to register global hotkey: ${e.message}", e)
+        } catch (e: Throwable) {
+            LOGGER.log(Level.WARNING, "Failed to register global hotkey: ${e.message}")
             false
         }
     }
@@ -72,10 +112,9 @@ class GlobalHotkeyManager {
         if (!registered.get()) return
 
         try {
-            GlobalScreen.removeNativeKeyListener(keyListener)
+            keyListener?.let { GlobalScreen.removeNativeKeyListener(it) }
             GlobalScreen.unregisterNativeHook()
-        } catch (e: Exception) {
-            LOGGER.log(Level.WARNING, "Error unregistering global hotkey: ${e.message}", e)
+        } catch (_: Throwable) {
         } finally {
             registered.set(false)
             ctrlPressed.set(false)
