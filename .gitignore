@@ -73,6 +73,7 @@ captures/
 .externalNativeBuild/
 .cxx/
 !gradle/wrapper/gradle-wrapper.jar
+!client-desktop/gradle/wrapper/gradle-wrapper.jar
 
 # ===== Node (if any) =====
 node_modules/
