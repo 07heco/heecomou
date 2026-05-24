@@ -12,12 +12,12 @@ data class VocabVO(
     val id: Long,
     val userId: Long,
     val word: String,
-    val pinyin: String?,
-    val category: String?,
-    val frequency: Int,
-    val version: Long,
-    @SerializedName("createdAt") val createdAt: String?,
-    @SerializedName("updatedAt") val updatedAt: String?
+    val pinyin: String? = null,
+    val category: String? = null,
+    val frequency: Int = 0,
+    val version: Long = 0,
+    @SerializedName("createdAt") val createdAt: String? = null,
+    @SerializedName("updatedAt") val updatedAt: String? = null
 )
 
 data class VocabAddRequest(

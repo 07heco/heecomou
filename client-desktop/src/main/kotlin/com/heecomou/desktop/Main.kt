@@ -120,7 +120,7 @@ fun main() = application {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Divider()
+                    HorizontalDivider()
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // Status indicators
@@ -131,7 +131,7 @@ fun main() = application {
                     StatusRow("方言", asrRouter.getSupportedDialects()[asrPreferences.dialect] ?: asrPreferences.dialect)
 
                     Spacer(modifier = Modifier.height(8.dp))
-                    Divider()
+                    HorizontalDivider()
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Row(

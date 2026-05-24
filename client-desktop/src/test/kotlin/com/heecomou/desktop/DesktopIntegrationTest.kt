@@ -17,7 +17,9 @@ import com.heecomou.desktop.vocab.VocabSyncManager
 import com.google.gson.Gson
 import org.junit.jupiter.api.*
 import java.io.File
-import kotlin.test.*
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class DesktopIntegrationTest {
@@ -318,7 +320,7 @@ class DesktopIntegrationTest {
         val vocab = VocabVO(
             id = 1L, userId = 1L, word = "test", pinyin = "test",
             category = "test", frequency = 1, version = 1L,
-            createdAt = null, updatedAt = null
+            createdAt = "2024-06-01T10:00:00", updatedAt = "2024-06-01T12:00:00"
         )
 
         val json = gson.toJson(vocab)

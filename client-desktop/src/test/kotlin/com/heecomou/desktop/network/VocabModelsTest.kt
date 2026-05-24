@@ -3,7 +3,9 @@ package com.heecomou.desktop.network
 import com.google.gson.Gson
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
-import kotlin.test.*
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class VocabModelsTest {
 
