@@ -1,5 +1,4 @@
 import io
-import os
 import wave
 import base64
 import logging

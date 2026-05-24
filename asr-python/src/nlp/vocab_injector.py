@@ -1,4 +1,3 @@
-import re
 import time
 import logging
 from collections import OrderedDict
