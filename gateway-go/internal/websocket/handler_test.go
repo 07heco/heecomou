@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const wsGUIDTest = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -43,25 +44,32 @@ func TestAudioHandlerIntegration(t *testing.T) {
 				return
 			}
 			go func(c net.Conn) {
+				defer c.Close()
+
+				c.SetReadDeadline(time.Now().Add(5 * time.Second))
+
 				reqBuf := make([]byte, 4096)
-				n, _ := c.Read(reqBuf)
+				n, err := c.Read(reqBuf)
+				if err != nil || n == 0 {
+					return
+				}
 				reqStr := string(reqBuf[:n])
 
-				lines := strings.SplitN(reqStr, "\r\n\r\n", 2)
-				headerPart := lines[0]
-				if len(lines) > 1 {
-					headerPart = strings.ReplaceAll(headerPart, "\r\n", "\r\n")
-				}
-
-				if !strings.Contains(headerPart, "Upgrade: websocket") &&
-					!strings.Contains(headerPart, "Upgrade: WebSocket") {
+				if !strings.Contains(reqStr, "Upgrade: websocket") &&
+					!strings.Contains(reqStr, "Upgrade: WebSocket") {
 					c.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
-					c.Close()
 					return
 				}
 
-				headers := parseHeaders(headerPart)
-				key := headers["Sec-Websocket-Key"]
+				headers := parseHeaders(reqStr)
+				key := headers["Sec-WebSocket-Key"]
+				if key == "" {
+					key = headers["Sec-Websocket-Key"]
+				}
+				if key == "" {
+					c.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+					return
+				}
 
 				h := sha1.New()
 				h.Write([]byte(key + wsGUIDTest))
@@ -72,7 +80,9 @@ func TestAudioHandlerIntegration(t *testing.T) {
 					"Connection: Upgrade\r\n" +
 					"Sec-WebSocket-Accept: " + acceptKey + "\r\n\r\n"
 
-				c.Write([]byte(resp))
+				if _, err := c.Write([]byte(resp)); err != nil {
+					return
+				}
 
 				sessionID := genUUID()
 				sessionDir := filepath.Join(dir, sessionID)
@@ -82,30 +92,30 @@ func TestAudioHandlerIntegration(t *testing.T) {
 					"type":       "session_started",
 					"session_id": sessionID,
 				})
-				writeWSText(c, msg)
+				if err := writeWSText(c, msg); err != nil {
+					return
+				}
 
-				sampleCount := 0
-				for {
-					op, payload, err := readWSFrame(c)
-					if err != nil {
-						break
-					}
-					if op == 2 {
-						sampleCount += len(payload) / 2
-						ack, _ := json.Marshal(map[string]interface{}{
-							"type":          "samples_received",
-							"sample_count":  len(payload) / 2,
-							"total_samples": sampleCount,
-						})
-						writeWSText(c, ack)
-					}
+				c.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+				op, payload, err := readWSFrame(c)
+				if err != nil {
+					return
+				}
+				if op == 2 {
+					sampleCount := len(payload) / 2
+					ack, _ := json.Marshal(map[string]interface{}{
+						"type":          "samples_received",
+						"sample_count":  len(payload) / 2,
+						"total_samples": sampleCount,
+					})
+					writeWSText(c, ack)
 				}
 
 				os.WriteFile(filepath.Join(sessionDir, "audio.wav"),
 					[]byte("RIFF\x00\x00\x00\x00WAVE"), 0644)
 				os.WriteFile(filepath.Join(sessionDir, "metadata.json"),
 					[]byte("{}"), 0644)
-				c.Close()
 			}(conn)
 		}
 	}()
@@ -149,7 +159,9 @@ func TestAudioHandlerIntegration(t *testing.T) {
 	}
 
 	pcm := createPCMData(100, 16000)
-	writeWSBinary(conn, pcm)
+	if err := writeWSBinary(conn, pcm); err != nil {
+		t.Fatalf("Failed to write binary frame: %v", err)
+	}
 
 	op, payload, err = readWSFrame(conn)
 	if err != nil {
@@ -203,6 +215,8 @@ func TestAudioHandlerNonWebSocket(t *testing.T) {
 	go func() {
 		conn, _ := listener.Accept()
 		if conn != nil {
+			defer conn.Close()
+			conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 			reqBuf := make([]byte, 4096)
 			n, _ := conn.Read(reqBuf)
 			reqStr := string(reqBuf[:n])
@@ -211,7 +225,6 @@ func TestAudioHandlerNonWebSocket(t *testing.T) {
 				!strings.Contains(reqStr, "Upgrade: WebSocket") {
 				conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
 			}
-			conn.Close()
 		}
 	}()
 
@@ -246,25 +259,37 @@ func parseHeaders(headerPart string) map[string]string {
 	return headers
 }
 
-func writeWSText(conn net.Conn, data []byte) {
+func writeWSText(conn net.Conn, data []byte) error {
 	frame := []byte{0x81}
-	frame = append(frame, byte(len(data)))
+	frame = append(frame, encodeWSLength(len(data))...)
 	frame = append(frame, data...)
-	conn.Write(frame)
+	_, err := conn.Write(frame)
+	return err
 }
 
-func writeWSBinary(conn net.Conn, data []byte) {
+func writeWSBinary(conn net.Conn, data []byte) error {
 	frame := []byte{0x82}
-	if len(data) < 126 {
-		frame = append(frame, byte(len(data)))
-	} else {
-		frame = append(frame, 126)
-		ext := make([]byte, 2)
-		binary.BigEndian.PutUint16(ext, uint16(len(data)))
-		frame = append(frame, ext...)
-	}
+	frame = append(frame, encodeWSLength(len(data))...)
 	frame = append(frame, data...)
-	conn.Write(frame)
+	_, err := conn.Write(frame)
+	return err
+}
+
+func encodeWSLength(length int) []byte {
+	switch {
+	case length < 126:
+		return []byte{byte(length)}
+	case length < 65536:
+		ext := make([]byte, 3)
+		ext[0] = 126
+		binary.BigEndian.PutUint16(ext[1:], uint16(length))
+		return ext
+	default:
+		ext := make([]byte, 9)
+		ext[0] = 127
+		binary.BigEndian.PutUint64(ext[1:], uint64(length))
+		return ext
+	}
 }
 
 func readWSFrame(conn net.Conn) (int, []byte, error) {
