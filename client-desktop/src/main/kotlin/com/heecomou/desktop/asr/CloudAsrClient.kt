@@ -44,7 +44,7 @@ enum class DesktopAsrClientState {
 }
 
 class CloudAsrClient(
-    private val gatewayHost: String = "localhost",
+    private val gatewayHost: String = "117.72.201.26",
     private val gatewayPort: Int = 8080,
     private val connectTimeoutMs: Long = 10_000L
 ) {

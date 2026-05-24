@@ -10,7 +10,7 @@ import java.util.logging.Level
 import java.util.logging.Logger
 
 class VocabApiService(
-    private val baseUrl: String = "http://localhost:8081",
+    private val baseUrl: String = "http://117.72.201.26:8081",
     private val tokenProvider: () -> String? = { null }
 ) {
     companion object {
