@@ -28,7 +28,7 @@ func createPCMData(durationMs int, sampleRate int) []byte {
 
 func TestAudioHandlerIntegration(t *testing.T) {
 	dir := t.TempDir()
-	_ = NewAudioHandler(dir)
+	_ = NewAudioHandler(dir, nil)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -192,7 +192,7 @@ func TestPCMGeneration(t *testing.T) {
 
 func TestAudioHandlerNonWebSocket(t *testing.T) {
 	dir := t.TempDir()
-	_ = NewAudioHandler(dir)
+	_ = NewAudioHandler(dir, nil)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

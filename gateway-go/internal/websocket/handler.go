@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/07heco/heecomou/gateway-go/internal/asr"
 	"github.com/07heco/heecomou/gateway-go/internal/audio"
 )
 
@@ -135,10 +136,11 @@ func (c *Conn) readFrame() (int, []byte, error) {
 
 type AudioHandler struct {
 	outputRoot string
+	forwarder  *asr.Forwarder
 }
 
-func NewAudioHandler(outputRoot string) *AudioHandler {
-	return &AudioHandler{outputRoot: outputRoot}
+func NewAudioHandler(outputRoot string, forwarder *asr.Forwarder) *AudioHandler {
+	return &AudioHandler{outputRoot: outputRoot, forwarder: forwarder}
 }
 
 func (h *AudioHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -203,8 +205,25 @@ func (h *AudioHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Session %s finalize error: %v", sessionID, err)
 		}
 		conn.Close()
+
+		sampleCount := writer.SampleCount()
+		duration := writer.Duration()
 		log.Printf("Audio session %s ended (samples=%d, duration=%.2fs)",
-			sessionID, writer.SampleCount(), writer.Duration())
+			sessionID, sampleCount, duration)
+
+		if h.forwarder != nil && sampleCount > 0 {
+			wavPath := filepath.Join(sessionDir, "audio.wav")
+			log.Printf("Session %s: forwarding to ASR...", sessionID)
+			result, err := h.forwarder.Forward(wavPath, "zh")
+			if err != nil {
+				log.Printf("Session %s ASR forward failed: %v", sessionID, err)
+			} else {
+				log.Printf("Session %s ASR result: %s", sessionID, result.Text)
+				asrResultPath := filepath.Join(sessionDir, "asr_result.json")
+				data, _ := json.Marshal(result)
+				os.WriteFile(asrResultPath, data, 0644)
+			}
+		}
 	}()
 
 	conn.WriteJSON(map[string]interface{}{
