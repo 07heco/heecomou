@@ -1,4 +1,5 @@
 import io
+import os
 import wave
 import base64
 import logging
@@ -6,6 +7,7 @@ import grpc
 
 from inference.engine import ASREngine
 from nlp.punctuator import restore_punctuation
+from nlp.vocab_injector import VocabInjector
 from asr_grpc.asr_service_pb2 import (
     RecognitionResult,
     HealthResponse,
@@ -19,8 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 class ASRServicer(ASRServiceServicer):
-    def __init__(self, engine: ASREngine):
+    def __init__(self, engine: ASREngine, vocab_injector: VocabInjector = None):
         self.engine = engine
+        self.vocab_injector = vocab_injector
 
     def StreamingRecognize(self, request_iterator, context):
         pcm_buffer = bytearray()
@@ -50,6 +53,19 @@ class ASRServicer(ASRServiceServicer):
                 final_text = restore_punctuation(final_text)
             except Exception:
                 pass
+
+            if self.vocab_injector is not None:
+                try:
+                    metadata = dict(context.invocation_metadata())
+                    user_id_str = metadata.get("x-user-id")
+                    user_id = int(user_id_str) if user_id_str else None
+                    vocab_str = metadata.get("x-vocab-words")
+                    vocab_words = vocab_str.split(",") if vocab_str else []
+                    final_text = self.vocab_injector.inject(
+                        final_text, vocab_words=vocab_words, user_id=user_id
+                    )
+                except Exception:
+                    pass
 
             yield RecognitionResult(
                 text=final_text,
@@ -83,11 +99,11 @@ class ASRServicer(ASRServiceServicer):
         return buf.getvalue()
 
 
-def create_server(engine: ASREngine, port: int = 50051, max_workers: int = 10):
+def create_server(engine: ASREngine, vocab_injector: VocabInjector = None, port: int = 50051, max_workers: int = 10):
     server = grpc.server(
         thread_pool=None,
         maximum_concurrent_rpcs=max_workers,
     )
-    add_ASRServiceServicer_to_server(ASRServicer(engine), server)
+    add_ASRServiceServicer_to_server(ASRServicer(engine, vocab_injector), server)
     server.add_insecure_port(f"0.0.0.0:{port}")
     return server

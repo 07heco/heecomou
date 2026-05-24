@@ -1,12 +1,14 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from inference.engine import ASREngine
+from nlp.vocab_injector import VocabInjector
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 model_id = os.getenv("ASR_MODEL_ID", "Qwen/Qwen3-ASR-1.7B")
 engine = ASREngine(model_id=model_id)
+
+backend_url = os.getenv("BACKEND_URL", "http://localhost:8081")
+vocab_injector = VocabInjector(backend_url=backend_url)
 
 
 @asynccontextmanager
@@ -53,6 +58,8 @@ app.add_middleware(
 class RecognizeRequest(BaseModel):
     audio: str = Field(..., description="Base64-encoded WAV audio data")
     language: str = Field(default="zh", description="Language code (zh/en/...)")
+    vocab_words: Optional[list[str]] = Field(default=None, description="User vocabulary words for injection")
+    user_id: Optional[int] = Field(default=None, description="User ID for vocabulary lookup")
 
 
 class RecognizeResponse(BaseModel):
@@ -89,8 +96,17 @@ async def recognize(req: RecognizeRequest):
 
     try:
         result = engine.recognize(req.audio, language=req.language)
+
+        text = result.text
+        if req.vocab_words or req.user_id is not None:
+            try:
+                words = req.vocab_words or []
+                text = vocab_injector.inject(text, vocab_words=words, user_id=req.user_id)
+            except Exception:
+                logger.exception("Vocab injection failed, using raw text")
+
         return RecognizeResponse(
-            text=result.text,
+            text=text,
             duration_ms=result.duration_ms,
             model_name=result.model_name,
         )
