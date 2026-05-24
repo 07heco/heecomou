@@ -33,7 +33,7 @@ jobs:
         with:
           java-version: "17"
           distribution: "temurin"
-      - run: mvn compile
+      - run: mvn test -B
 
   asr-lint:
     name: Python ASR Lint
