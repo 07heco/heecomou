@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package asr;
+
+service ASRService {
+  rpc StreamingRecognize(stream AudioChunk) returns (stream RecognitionResult);
+  rpc GetHealth(HealthRequest) returns (HealthResponse);
+}
+
+message AudioChunk {
+  bytes audio_data = 1;
+  string language = 2;
+}
+
+message RecognitionResult {
+  string text = 1;
+  bool is_final = 2;
+  double duration_ms = 3;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool model_loaded = 1;
+  string model_name = 2;
+}
