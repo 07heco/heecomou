@@ -12,6 +12,8 @@ import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
 import com.heecomou.ime.audio.AudioCaptureManager
 import com.heecomou.ime.audio.ClientVAD
+import com.heecomou.ime.asr.AsrEngineMode
+import com.heecomou.ime.asr.LocalAsrClient
 import com.heecomou.ime.network.asr.CloudAsrClient
 import com.heecomou.ime.ui.voice.VoiceInputPanel
 import com.heecomou.ime.ui.voice.VoiceInputState
@@ -28,11 +30,20 @@ class HeecoMouIME : InputMethodService() {
     private lateinit var voicePanel: VoiceInputPanel
     private lateinit var audioCapture: AudioCaptureManager
     private var asrClient: CloudAsrClient? = null
+    private var localAsrClient: LocalAsrClient? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private var isRecording = false
     private var stopRecordingTask: Runnable? = null
     private var vad: ClientVAD? = null
+    private var engineMode: AsrEngineMode = AsrEngineMode.AUTO
+
+    fun setEngineMode(mode: AsrEngineMode) {
+        engineMode = mode
+        Log.d(TAG, "Engine mode changed to: ${mode.label}")
+    }
+
+    fun getEngineMode(): AsrEngineMode = engineMode
 
     override fun onCreate() {
         super.onCreate()
@@ -97,16 +108,11 @@ class HeecoMouIME : InputMethodService() {
 
         vad = ClientVAD().apply { reset() }
 
-        asrClient = CloudAsrClient()
-        asrClient?.onSessionStarted = { session ->
-            Log.d(TAG, "ASR session started: ${session.sessionId}")
+        if (engineMode == AsrEngineMode.LOCAL) {
+            startLocalRecognition()
+        } else {
+            startCloudRecognition()
         }
-        asrClient?.onError = { error ->
-            mainHandler.post {
-                voicePanel.setState(VoiceInputState.ERROR, error)
-            }
-        }
-        asrClient?.connect()
 
         audioCapture.onAudioData = { pcmData ->
             val shortSamples = ShortArray(pcmData.size / 2)
@@ -117,7 +123,11 @@ class HeecoMouIME : InputMethodService() {
             }
             val hasSpeech = vad?.detect(shortSamples) ?: true
             if (hasSpeech) {
-                asrClient?.sendAudio(pcmData)
+                if (engineMode == AsrEngineMode.LOCAL) {
+                    localAsrClient?.feedPcmData(pcmData, true, System.currentTimeMillis())
+                } else {
+                    asrClient?.sendAudio(pcmData)
+                }
             }
         }
         audioCapture.onError = { error ->
@@ -137,6 +147,39 @@ class HeecoMouIME : InputMethodService() {
         mainHandler.postDelayed(stopRecordingTask!!, MAX_RECORD_MS)
     }
 
+    private fun startCloudRecognition() {
+        asrClient = CloudAsrClient()
+        asrClient?.onSessionStarted = { session ->
+            Log.d(TAG, "ASR session started: ${session.sessionId}")
+        }
+        asrClient?.onError = { error ->
+            mainHandler.post {
+                voicePanel.setState(VoiceInputState.ERROR, error)
+            }
+        }
+        asrClient?.connect()
+    }
+
+    private fun startLocalRecognition() {
+        localAsrClient = LocalAsrClient(this)
+        localAsrClient?.onStateChanged = { state ->
+            Log.d(TAG, "Local ASR state: $state")
+        }
+        localAsrClient?.onFinalResult = { text ->
+            mainHandler.post {
+                voicePanel.setState(VoiceInputState.RESULT)
+                voicePanel.setResultText(text)
+            }
+        }
+        localAsrClient?.onError = { error ->
+            mainHandler.post {
+                voicePanel.setState(VoiceInputState.ERROR, error)
+            }
+        }
+        localAsrClient?.initialize()
+        localAsrClient?.startListening()
+    }
+
     private fun stopVoiceInput() {
         isRecording = false
         stopRecordingTask?.let { mainHandler.removeCallbacks(it) }
@@ -144,8 +187,12 @@ class HeecoMouIME : InputMethodService() {
 
         audioCapture.stopRecording()
         ioExecutor.execute {
-            asrClient?.disconnect()
-            asrClient = null
+            if (engineMode == AsrEngineMode.LOCAL) {
+                localAsrClient?.stopListening()
+            } else {
+                asrClient?.disconnect()
+                asrClient = null
+            }
         }
 
         voicePanel.setState(VoiceInputState.RECOGNIZING)
@@ -174,6 +221,8 @@ class HeecoMouIME : InputMethodService() {
         audioCapture.release()
         asrClient?.disconnect()
         asrClient = null
+        localAsrClient?.release()
+        localAsrClient = null
         ioExecutor.shutdown()
     }
 }

@@ -69,6 +69,13 @@ class VoiceInputPanel @JvmOverloads constructor(
         addView(resultText)
     }
 
+    fun setResultText(text: String) {
+        post {
+            resultText.text = text
+            resultText.visibility = VISIBLE
+        }
+    }
+
     fun setState(state: VoiceInputState, message: String? = null) {
         post {
             when (state) {
