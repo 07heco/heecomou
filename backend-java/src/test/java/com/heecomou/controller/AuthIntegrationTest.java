@@ -71,25 +71,36 @@ class AuthIntegrationTest {
 
     @Test
     @Order(1)
-    @DisplayName("步骤1: 注册新用户 → 200 返回用户信息")
+    @DisplayName("步骤1: 注册新用户 → 200 返回 Token 和用户信息")
     void step1_register() throws Exception {
         RegisterRequest request = new RegisterRequest();
         request.setUsername(TEST_USERNAME);
         request.setPassword(TEST_PASSWORD);
         request.setEmail(TEST_EMAIL);
 
-        var result = mockMvc.perform(post("/api/v1/auth/register")
+        String responseBody = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andReturn();
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.data.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.data.expiresIn").isNumber())
+                .andExpect(jsonPath("$.data.userId").isNumber())
+                .andExpect(jsonPath("$.data.username").value(TEST_USERNAME))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
 
-        assertEquals(200, result.getResponse().getStatus(), "Register should return 200");
+        JsonNode root = objectMapper.readTree(responseBody);
+        accessToken = root.get("data").get("accessToken").asText();
+        refreshToken = root.get("data").get("refreshToken").asText();
 
-        JsonNode root = objectMapper.readTree(result.getResponse().getContentAsString());
-        assertEquals(200, root.get("code").asInt());
-        assertEquals(TEST_USERNAME, root.get("data").get("username").asText());
-        assertEquals(TEST_EMAIL, root.get("data").get("email").asText());
-        assertNotNull(root.get("data").get("id").asLong());
+        assertNotNull(accessToken);
+        assertNotNull(refreshToken);
+        assertTrue(accessToken.length() > 20);
+        assertTrue(refreshToken.length() > 20);
     }
 
     @Test

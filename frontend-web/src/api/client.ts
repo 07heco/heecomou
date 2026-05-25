@@ -111,7 +111,7 @@ api.interceptors.response.use(
 
 export const authApi = {
   register: (data: RegisterRequest) =>
-    api.post<ApiResponse<UserVO>>('/auth/register', data),
+    api.post<ApiResponse<LoginResponse>>('/auth/register', data),
 
   login: (data: LoginRequest) =>
     api.post<ApiResponse<LoginResponse>>('/auth/login', data),

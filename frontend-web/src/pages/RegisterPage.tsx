@@ -25,7 +25,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { register, login } = useAuthStore();
+  const { register } = useAuthStore();
   const navigate = useNavigate();
 
   const validate = (): string | null => {
@@ -54,7 +54,6 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register({ username: username.trim(), email: email.trim(), password });
-      await login({ username: username.trim(), password });
       navigate('/');
     } catch (err: any) {
       const status = err.response?.status;

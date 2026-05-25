@@ -40,9 +40,16 @@ public class AuthController {
 
     @RateLimit(key = "register", capacity = 10, rate = 10, seconds = 60)
     @PostMapping("/register")
-    public ApiResponse<UserVO> register(@Valid @RequestBody RegisterRequest request) {
+    public ApiResponse<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
         UserVO userVO = userService.register(request);
-        return ApiResponse.success(userVO);
+
+        String accessToken = jwtUtil.generateToken(userVO.getId(), userVO.getUsername());
+        String refreshToken = jwtUtil.generateRefreshToken(userVO.getId(), userVO.getUsername());
+        long refreshTtl = jwtUtil.getRemainingTtl(refreshToken);
+        refreshTokenService.save(refreshToken, userVO.getId(), refreshTtl);
+
+        long expiresIn = jwtUtil.getRemainingTtl(accessToken);
+        return ApiResponse.success("注册成功", LoginResponse.of(accessToken, refreshToken, expiresIn, userVO));
     }
 
     @RateLimit(key = "login", capacity = 10, rate = 10, seconds = 60)
