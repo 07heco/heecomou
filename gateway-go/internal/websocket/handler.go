@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/07heco/heecomou/gateway-go/internal/asr"
 	"github.com/07heco/heecomou/gateway-go/internal/audio"
@@ -60,6 +61,10 @@ func (c *Conn) RemoteAddr() net.Addr {
 	return c.conn.RemoteAddr()
 }
 
+func (c *Conn) SetReadDeadline(t time.Time) error {
+	return c.conn.SetReadDeadline(t)
+}
+
 func (c *Conn) writeFrame(opcode int, payload []byte) error {
 	frame := make([]byte, 2)
 	frame[0] = 0x80 | byte(opcode)
@@ -93,6 +98,7 @@ func (c *Conn) readFrame() (int, []byte, error) {
 	}
 
 	opcode := int(header[0] & 0x0F)
+	masked := (header[1] & 0x80) != 0
 	length := uint64(header[1] & 0x7F)
 
 	switch {
@@ -114,10 +120,23 @@ func (c *Conn) readFrame() (int, []byte, error) {
 		return 0, nil, fmt.Errorf("frame too large: %d", length)
 	}
 
+	var maskKey [4]byte
+	if masked {
+		if _, err := io.ReadFull(c.reader, maskKey[:]); err != nil {
+			return 0, nil, err
+		}
+	}
+
 	payload := make([]byte, length)
 	if length > 0 {
 		if _, err := io.ReadFull(c.reader, payload); err != nil {
 			return 0, nil, err
+		}
+	}
+
+	if masked {
+		for i := range payload {
+			payload[i] ^= maskKey[i%4]
 		}
 	}
 
@@ -204,7 +223,6 @@ func (h *AudioHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := writer.Finalize(); err != nil {
 			log.Printf("Session %s finalize error: %v", sessionID, err)
 		}
-		conn.Close()
 
 		sampleCount := writer.SampleCount()
 		duration := writer.Duration()
@@ -217,13 +235,25 @@ func (h *AudioHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			result, err := h.forwarder.Forward(wavPath, "zh")
 			if err != nil {
 				log.Printf("Session %s ASR forward failed: %v", sessionID, err)
+				conn.WriteJSON(map[string]interface{}{
+					"type":    "error",
+					"message": fmt.Sprintf("ASR failed: %v", err),
+				})
 			} else {
 				log.Printf("Session %s ASR result: %s", sessionID, result.Text)
+				conn.WriteJSON(map[string]interface{}{
+					"type":       "final_result",
+					"text":       result.Text,
+					"is_final":   true,
+					"confidence": 1.0,
+				})
 				asrResultPath := filepath.Join(sessionDir, "asr_result.json")
 				data, _ := json.Marshal(result)
 				os.WriteFile(asrResultPath, data, 0644)
 			}
 		}
+
+		conn.Close()
 	}()
 
 	conn.WriteJSON(map[string]interface{}{
@@ -236,10 +266,14 @@ func (h *AudioHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
+	readTimeout := 3 * time.Second
 	for {
+		conn.SetReadDeadline(time.Now().Add(readTimeout))
 		messageType, message, err := conn.ReadMessage()
 		if err != nil {
-			if err != io.EOF {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				log.Printf("Session %s read timeout (end of speech)", sessionID)
+			} else if err != io.EOF {
 				log.Printf("Session %s read error: %v", sessionID, err)
 			}
 			break

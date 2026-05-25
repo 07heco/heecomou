@@ -101,6 +101,13 @@ credentials/
 *.ckpt
 !scripts/test-audio/*.wav
 
+# ===== Desktop App =====
+client-desktop/bin/
+client-desktop/*.db
+
+# ===== Go compiled binaries =====
+gateway-go/gateway
+
 # ===== Misc =====
 *.zip
 *.tar.gz

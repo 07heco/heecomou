@@ -32,6 +32,8 @@ fun FrameWindowScope.FloatingVoiceWindow(
     recognizedText: String,
     partialText: String,
     audioLevel: Float,
+    recordingSeconds: Long,
+    maxSeconds: Int,
     onDismiss: () -> Unit
 ) {
     val isActive = state == VoiceInputState.LISTENING || state == VoiceInputState.RECOGNIZING
@@ -54,7 +56,11 @@ fun FrameWindowScope.FloatingVoiceWindow(
         ) {
             when (state) {
                 VoiceInputState.IDLE -> IdleContent()
-                VoiceInputState.LISTENING -> ListeningContent(animatedLevel)
+                VoiceInputState.LISTENING -> ListeningContent(
+                    animatedLevel = animatedLevel,
+                    recordingSeconds = recordingSeconds,
+                    maxSeconds = maxSeconds
+                )
                 VoiceInputState.RECOGNIZING -> RecognizingContent(partialText)
                 VoiceInputState.RESULT -> ResultContent(recognizedText, onDismiss)
             }
@@ -97,7 +103,11 @@ private fun IdleContent() {
 }
 
 @Composable
-private fun ListeningContent(animatedLevel: Float) {
+private fun ListeningContent(
+    animatedLevel: Float,
+    recordingSeconds: Long,
+    maxSeconds: Int
+) {
     Spacer(modifier = Modifier.height(8.dp))
 
     Box(
@@ -117,19 +127,33 @@ private fun ListeningContent(animatedLevel: Float) {
 
     Spacer(modifier = Modifier.height(4.dp))
 
+    val minutes = recordingSeconds / 60
+    val seconds = recordingSeconds % 60
+    val timeText = "%d:%02d".format(minutes, seconds)
+    val remaining = maxSeconds - recordingSeconds.toInt()
+
     Text(
-        text = "正在聆听...",
+        text = "正在聆听...  $timeText",
         color = Color.White.copy(alpha = 0.9f),
         fontSize = 14.sp,
         fontWeight = FontWeight.Medium,
         textAlign = TextAlign.Center
     )
 
+    if (remaining <= 10) {
+        Text(
+            text = "即将自动停止: ${remaining}秒",
+            color = Color(0xFFFF6B6B),
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+
     AudioLevelBars(animatedLevel)
 
     Text(
-        text = "说完后自动识别",
-        color = Color.White.copy(alpha = 0.4f),
+        text = "再按 Ctrl+Shift+V 停止识别 | 最长${maxSeconds}秒",
+        color = Color.White.copy(alpha = 0.5f),
         fontSize = 11.sp,
         textAlign = TextAlign.Center
     )
@@ -138,17 +162,6 @@ private fun ListeningContent(animatedLevel: Float) {
 @Composable
 private fun RecognizingContent(partialText: String) {
     Spacer(modifier = Modifier.height(8.dp))
-
-    val infiniteTransition = rememberInfiniteTransition(label = "recognizing")
-    infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotation"
-    )
 
     Box(
         modifier = Modifier

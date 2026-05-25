@@ -16,7 +16,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-model_id = os.getenv("ASR_MODEL_ID", "Qwen/Qwen3-ASR-1.7B")
+model_id = os.getenv("ASR_MODEL_ID", "openai/whisper-small")
 engine = ASREngine(model_id=model_id)
 
 backend_url = os.getenv("BACKEND_URL", "http://localhost:8081")

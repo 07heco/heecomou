@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
+import zhconv
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class RecognitionResult:
 
 
 class ASREngine:
-    MODEL_ID = "Qwen/Qwen3-ASR-1.7B"
+    MODEL_ID = "openai/whisper-small"
 
     def __init__(self, model_id: Optional[str] = None, device: Optional[str] = None):
         self.model_id = model_id or self.MODEL_ID
@@ -34,8 +35,6 @@ class ASREngine:
         self._processor = None
         self._loaded = False
         self._torch = None
-        self._AutoModel = None
-        self._AutoProcessor = None
 
         if device is None:
             self._device = "cpu"
@@ -50,13 +49,6 @@ class ASREngine:
             self._torch = torch
         return self._torch
 
-    def _ensure_transformers(self):
-        if self._AutoModel is None:
-            from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
-            self._AutoModel = AutoModelForSpeechSeq2Seq
-            self._AutoProcessor = AutoProcessor
-        return self._AutoModel, self._AutoProcessor
-
     @property
     def is_loaded(self) -> bool:
         return self._loaded
@@ -66,25 +58,23 @@ class ASREngine:
             return
 
         torch = self._ensure_torch()
-        AutoModel, AutoProcessor = self._ensure_transformers()
 
         logger.info("Loading ASR model %s on %s...", self.model_id, self._device)
         start = time.time()
 
-        self._processor = AutoProcessor.from_pretrained(
-            self.model_id, trust_remote_code=True
-        )
+        from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
+
+        self._processor = AutoProcessor.from_pretrained(self.model_id)
 
         torch_dtype = (
             torch.float16
             if self._device.startswith("cuda")
             else torch.float32
         )
-        self._model = AutoModel.from_pretrained(
+        self._model = AutoModelForSpeechSeq2Seq.from_pretrained(
             self.model_id,
             torch_dtype=torch_dtype,
             low_cpu_mem_usage=True,
-            trust_remote_code=True,
         ).to(self._device)
 
         self._model.eval()
@@ -149,24 +139,25 @@ class ASREngine:
         audio_np, sample_rate = self._decode_audio(audio_b64)
 
         start_time = time.time()
-        inputs = self._processor(
+
+        input_features = self._processor(
             audio_np,
             sampling_rate=sample_rate,
             return_tensors="pt",
+        ).input_features.to(self._device)
+
+        predicted_ids = self._model.generate(
+            input_features,
+            language=language,
+            task="transcribe",
         )
-        inputs = {k: v.to(self._device) for k, v in inputs.items()}
 
-        with torch.no_grad():
-            generated_ids = self._model.generate(
-                **inputs,
-                language=language,
-                max_new_tokens=256,
-            )
-
-        generated_ids = generated_ids[:, inputs["input_features"].shape[1]:]
         text = self._processor.batch_decode(
-            generated_ids, skip_special_tokens=True
+            predicted_ids, skip_special_tokens=True
         )[0].strip()
+
+        # Convert to Simplified Chinese
+        text = zhconv.convert(text, "zh-cn")
 
         duration_ms = (time.time() - start_time) * 1000.0
 
