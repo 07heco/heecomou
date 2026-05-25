@@ -51,6 +51,15 @@ fun main() = application {
     var maxSeconds by remember { mutableStateOf(MAX_RECORDING_SECONDS) }
     var timerJob by remember { mutableStateOf<Job?>(null) }
 
+    fun bumpUsedWords(text: String) {
+        if (text.isBlank()) return
+        val words = text.replace(Regex("[^\\u4e00-\\u9fff\\w]"), " ").split(" ")
+            .filter { it.length >= 2 }
+        for (w in words) {
+            vocabSyncManager.bumpWordFrequency(w)
+        }
+    }
+
     fun finishRecording() {
         if (voiceInputState != VoiceInputState.LISTENING) return
         timerJob?.cancel()
@@ -107,6 +116,7 @@ fun main() = application {
             cloudAsrClient.disconnect()
             coroutineScope.launch {
                 textOutput.output(text)
+                bumpUsedWords(text)
             }
         }
         cloudAsrClient.onConnectionFailed = { err ->
@@ -162,6 +172,8 @@ fun main() = application {
             return
         }
 
+        localAsrClient.vocabWords = localVocabStore.search("", 500).map { it.first }
+
         audioCaptureManager.onAudioData = { pcmData ->
             localAsrClient.feedPcmData(
                 pcmData,
@@ -189,6 +201,7 @@ fun main() = application {
             audioCaptureManager.stopRecording()
             coroutineScope.launch {
                 textOutput.output(text)
+                bumpUsedWords(text)
             }
         }
         localAsrClient.onError = { err ->
@@ -277,6 +290,15 @@ fun main() = application {
                 vocabCount = vocabSyncManager.getLocalWordCount()
                 statusMessage = "词库同步完成 (${vocabCount} 词)"
             } catch (_: Exception) {
+            }
+
+            while (isActive) {
+                delay(120_000L)
+                try {
+                    vocabSyncManager.syncIfNeeded()
+                    vocabCount = vocabSyncManager.getLocalWordCount()
+                } catch (_: Exception) {
+                }
             }
         }
     }

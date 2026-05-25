@@ -79,14 +79,15 @@ class VocabModelsTest {
     }
 
     @Test
-    @DisplayName("VocabSyncResponse should have max_version field")
+    @DisplayName("VocabSyncResponse should have maxVersion field")
     fun `VocabSyncResponse serialization`() {
         val sync = VocabSyncResponse(
             items = emptyList(),
-            maxVersion = 999L
+            maxVersion = 999L,
+            hasMore = false
         )
         val json = gson.toJson(sync)
-        assertTrue(json.contains("max_version"))
+        assertTrue(json.contains("maxVersion"))
         assertTrue(json.contains("999"))
 
         val deserialized = gson.fromJson(json, VocabSyncResponse::class.java)

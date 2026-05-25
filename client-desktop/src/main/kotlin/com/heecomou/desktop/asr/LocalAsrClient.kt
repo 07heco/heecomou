@@ -34,6 +34,8 @@ class LocalAsrClient {
     @Volatile var isModelLoaded: Boolean = false
         private set
 
+    @Volatile var vocabWords: List<String> = emptyList()
+
     private var serverProcess: Process? = null
     private val apiService = LocalAsrApiService(LOCAL_SERVER_URL)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -190,7 +192,8 @@ class LocalAsrClient {
                 val audioB64 = Base64.getEncoder().encodeToString(wavBytes)
 
                 LOGGER.info("Sending ${wavBytes.size} bytes WAV to local ONNX server...")
-                val result = apiService.recognize(audioB64, "zh")
+                val words = if (vocabWords.isNotEmpty()) vocabWords else null
+                val result = apiService.recognize(audioB64, "zh", vocabWords = words)
 
                 if (result != null && result.text.isNotBlank()) {
                     onFinalResult?.invoke(result.text)

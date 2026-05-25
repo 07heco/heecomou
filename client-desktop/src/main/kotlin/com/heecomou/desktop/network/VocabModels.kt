@@ -35,5 +35,6 @@ data class VocabListResponse(
 
 data class VocabSyncResponse(
     val items: List<VocabVO>,
-    @SerializedName("max_version") val maxVersion: Long
+    @SerializedName("maxVersion") val maxVersion: Long,
+    @SerializedName("hasMore") val hasMore: Boolean = false
 )

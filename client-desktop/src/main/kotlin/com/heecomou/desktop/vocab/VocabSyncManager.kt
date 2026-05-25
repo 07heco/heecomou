@@ -14,21 +14,21 @@ class VocabSyncManager(
 
     fun syncIfNeeded(): Boolean {
         return try {
-            val maxVersion = localStore.getMaxVersion()
-            var hasMore = true
+            var currentVersion = localStore.getMaxVersion()
             var syncedCount = 0
 
-            while (hasMore) {
-                val response = apiService.sync(maxVersion)
+            while (true) {
+                val response = apiService.sync(currentVersion)
                 if (response?.code == 200 && response.data != null) {
                     val items = response.data.items
                     if (items.isNotEmpty()) {
                         localStore.upsertBatch(items)
                         syncedCount += items.size
                     }
-                    hasMore = items.size >= 500
+                    currentVersion = maxOf(currentVersion, response.data.maxVersion)
+                    if (!response.data.hasMore) break
                 } else {
-                    hasMore = false
+                    break
                 }
             }
 

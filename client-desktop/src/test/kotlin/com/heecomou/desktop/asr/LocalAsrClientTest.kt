@@ -82,17 +82,14 @@ class LocalAsrClientTest {
     fun `stop produces final result`() {
         client.startListening()
 
-        var finalText = ""
-        client.onFinalResult = { finalText = it }
+        client.onFinalResult = { /* callback registered, won't fire without ONNX server */ }
 
         val pcmData = ByteArray(1280)
         client.feedPcmData(pcmData, isSpeech = true, timestampMs = 0L)
 
         client.stopListening()
 
-        // Final result is async (coroutine → HTTP), may be stubbed in test
-        // Without a running ONNX server, onFinalResult may not fire
-        // This test validates the state transition + callback wiring
+        // Validate state transition
         assertEquals(LocalAsrState.READY, client.currentState)
     }
 

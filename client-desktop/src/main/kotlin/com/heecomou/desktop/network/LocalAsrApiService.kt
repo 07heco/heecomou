@@ -10,7 +10,9 @@ import java.util.concurrent.TimeUnit
 
 data class LocalAsrRequest(
     @SerializedName("audio_b64") val audioB64: String,
-    @SerializedName("language") val language: String = "zh"
+    @SerializedName("language") val language: String = "zh",
+    @SerializedName("vocab_words") val vocabWords: List<String>? = null,
+    @SerializedName("user_id") val userId: Int? = null
 )
 
 data class LocalAsrResponse(
@@ -49,9 +51,9 @@ class LocalAsrApiService(private val baseUrl: String) {
         }
     }
 
-    fun recognize(audioB64: String, language: String): LocalAsrResponse? {
+    fun recognize(audioB64: String, language: String, vocabWords: List<String>? = null, userId: Int? = null): LocalAsrResponse? {
         return try {
-            val req = LocalAsrRequest(audioB64 = audioB64, language = language)
+            val req = LocalAsrRequest(audioB64 = audioB64, language = language, vocabWords = vocabWords, userId = userId)
             val jsonBody = gson.toJson(req)
             val request = Request.Builder()
                 .url("$baseUrl/api/v1/asr/local/recognize")
