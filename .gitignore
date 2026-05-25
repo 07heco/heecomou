@@ -113,3 +113,7 @@ gateway-go/gateway
 *.tar.gz
 *.rar
 .DS_Store
+
+# ===== Project Docs (generated) =====
+.trae/
+docs/
