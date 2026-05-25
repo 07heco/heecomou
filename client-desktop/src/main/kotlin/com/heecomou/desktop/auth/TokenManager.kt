@@ -13,29 +13,41 @@ data class StoredToken(
 
 class TokenManager {
     private val gson = Gson()
-    private val storageFile: File
+    val storageFile: File
+    val writable: Boolean
+    val storagePath: String
 
     init {
-        val home = System.getProperty("user.home") ?: System.getProperty("java.io.tmpdir") ?: "."
-        val dotDir = File(home, ".heecomou")
-        if (dotDir.exists() || dotDir.mkdirs()) {
-            storageFile = File(dotDir, "auth.json")
+        val appData = System.getenv("LOCALAPPDATA")
+            ?: System.getenv("APPDATA")
+            ?: System.getProperty("java.io.tmpdir")
+            ?: System.getProperty("user.dir")
+            ?: "."
+        val dataDir = File(appData, "HeecoMou")
+        val ok = dataDir.exists() || dataDir.mkdirs()
+        if (ok) {
+            storageFile = File(dataDir, "auth.json")
+            writable = true
         } else {
-            val altDir = File(home, "heecomou_data")
-            altDir.mkdirs()
-            storageFile = File(altDir, "auth.json")
+            val tmp = File(System.getProperty("java.io.tmpdir") ?: ".", "heecomou_token.json")
+            storageFile = tmp
+            writable = tmp.parentFile?.canWrite() ?: false
         }
+        storagePath = storageFile.absolutePath
     }
 
     fun save(token: StoredToken) {
         val parent = storageFile.parentFile
         if (parent != null && !parent.exists()) {
-            parent.mkdirs()
+            val created = parent.mkdirs()
+            if (!created) {
+                throw RuntimeException("无法创建目录: ${parent.absolutePath}")
+            }
         }
         try {
             storageFile.writeText(gson.toJson(token))
         } catch (e: Exception) {
-            throw RuntimeException("无法保存登录信息: ${e.message}", e)
+            throw RuntimeException("无法保存登录信息到 ${storageFile.absolutePath}: ${e.message}", e)
         }
     }
 

@@ -36,6 +36,8 @@ fun main() = application {
     val vocabApiService = remember { VocabApiService(tokenProvider = { tokenManager.getAccessToken() }) }
     val localVocabStore = remember { LocalVocabStore() }
     val vocabSyncManager = remember { VocabSyncManager(vocabApiService, localVocabStore) }
+
+    println("[TokenManager] 存储路径: ${tokenManager.storagePath}, 可写: ${tokenManager.writable}")
     val asrRouter = remember { AsrRouter() }
     val audioCaptureManager = remember { AudioCaptureManager() }
     val cloudAsrClient = remember { CloudAsrClient() }
