@@ -17,6 +17,7 @@ import com.heecomou.desktop.hotkey.GlobalHotkeyManager
 import com.heecomou.desktop.network.VocabApiService
 import com.heecomou.desktop.ui.FloatingVoiceWindow
 import com.heecomou.desktop.ui.TextOutputManager
+import com.heecomou.desktop.asr.LocalAsrState
 import com.heecomou.desktop.ui.VoiceInputState
 import com.heecomou.desktop.vocab.LocalVocabStore
 import com.heecomou.desktop.vocab.VocabSyncManager
@@ -34,6 +35,7 @@ fun main() = application {
     val asrRouter = remember { AsrRouter() }
     val audioCaptureManager = remember { AudioCaptureManager() }
     val cloudAsrClient = remember { CloudAsrClient() }
+    val localAsrClient = remember { LocalAsrClient() }
     val coroutineScope = rememberCoroutineScope()
 
     var isMainWindowVisible by remember { mutableStateOf(true) }
@@ -54,8 +56,162 @@ fun main() = application {
         timerJob?.cancel()
         println("[DEBUG] manual stop: stopping audio capture, waiting for ASR result...")
         audioCaptureManager.stopRecording()
+        if (localAsrClient.currentState == LocalAsrState.RECOGNIZING) {
+            localAsrClient.stopListening()
+        }
         voiceInputState = VoiceInputState.RECOGNIZING
         statusMessage = "等待识别结果..."
+    }
+
+    fun startRecordingTimer() {
+        timerJob = coroutineScope.launch {
+            val startTime = System.currentTimeMillis()
+            while (isActive) {
+                delay(1000)
+                val elapsed = (System.currentTimeMillis() - startTime) / 1000
+                recordingSeconds = elapsed
+                if (elapsed >= MAX_RECORDING_SECONDS.toLong()) {
+                    println("[DEBUG] max timeout reached, stopping...")
+                    finishRecording()
+                    break
+                }
+            }
+        }
+    }
+
+    fun startCloudRecognition() {
+        println("[DEBUG] startCloudRecognition: connecting to cloud ASR...")
+
+        audioCaptureManager.onAudioData = { pcmData ->
+            cloudAsrClient.sendAudio(pcmData)
+            val level = pcmData.map { abs(it.toInt()) }.average().toFloat() / 128f
+            audioLevel = level.coerceIn(0f, 1f)
+        }
+        audioCaptureManager.onError = { err ->
+            statusMessage = "音频: $err"
+            println("[DEBUG] audio error: $err")
+        }
+
+        cloudAsrClient.onPartialResult = { text ->
+            partialText = text
+            voiceInputState = VoiceInputState.RECOGNIZING
+            println("[DEBUG] partial: $text")
+        }
+        cloudAsrClient.onFinalResult = { text, confidence ->
+            recognizedText = text
+            voiceInputState = VoiceInputState.RESULT
+            statusMessage = "云端识别完成"
+            println("[DEBUG] final: $text (confidence=$confidence)")
+            timerJob?.cancel()
+            audioCaptureManager.stopRecording()
+            cloudAsrClient.disconnect()
+            coroutineScope.launch {
+                textOutput.output(text)
+            }
+        }
+        cloudAsrClient.onConnectionFailed = { err ->
+            statusMessage = "连接失败: $err"
+            voiceInputState = VoiceInputState.IDLE
+            isVoiceWindowVisible = false
+            timerJob?.cancel()
+            audioCaptureManager.stopRecording()
+            println("[DEBUG] connection failed: $err")
+        }
+        cloudAsrClient.onError = { err ->
+            statusMessage = "识别错误: $err"
+            println("[DEBUG] asr error: $err")
+            timerJob?.cancel()
+            audioCaptureManager.stopRecording()
+            cloudAsrClient.disconnect()
+            recognizedText = "识别失败: $err"
+            voiceInputState = VoiceInputState.RESULT
+        }
+        cloudAsrClient.onDisconnected = {
+            println("[DEBUG] ws disconnected, currentState=$voiceInputState")
+            timerJob?.cancel()
+            if (voiceInputState == VoiceInputState.LISTENING || voiceInputState == VoiceInputState.RECOGNIZING) {
+                audioCaptureManager.stopRecording()
+                voiceInputState = VoiceInputState.IDLE
+                statusMessage = "识别超时，请重试"
+                isVoiceWindowVisible = false
+            }
+        }
+
+        cloudAsrClient.connect()
+        println("[DEBUG] starting audio recording...")
+        val recordingStarted = audioCaptureManager.startRecording()
+        println("[DEBUG] recording started=$recordingStarted")
+        if (!recordingStarted) {
+            statusMessage = "麦克风启动失败"
+            voiceInputState = VoiceInputState.IDLE
+            isVoiceWindowVisible = false
+            return
+        }
+
+        startRecordingTimer()
+    }
+
+    fun startLocalRecognition() {
+        println("[DEBUG] startLocalRecognition: initializing local ASR...")
+
+        if (!localAsrClient.initialize()) {
+            println("[DEBUG] local ASR init failed, falling back to cloud")
+            statusMessage = "端侧初始化失败，切换到云端"
+            voiceInputState = VoiceInputState.IDLE
+            startCloudRecognition()
+            return
+        }
+
+        audioCaptureManager.onAudioData = { pcmData ->
+            localAsrClient.feedPcmData(
+                pcmData,
+                isSpeech = true,
+                timestampMs = System.currentTimeMillis()
+            )
+            val level = pcmData.map { abs(it.toInt()) }.average().toFloat() / 128f
+            audioLevel = level.coerceIn(0f, 1f)
+        }
+        audioCaptureManager.onError = { err ->
+            statusMessage = "音频: $err"
+            println("[DEBUG] audio error: $err")
+        }
+
+        localAsrClient.onPartialResult = { text ->
+            partialText = text
+            println("[DEBUG] local partial: $text")
+        }
+        localAsrClient.onFinalResult = { text ->
+            recognizedText = text
+            voiceInputState = VoiceInputState.RESULT
+            statusMessage = "端侧识别完成"
+            println("[DEBUG] local final: $text")
+            timerJob?.cancel()
+            audioCaptureManager.stopRecording()
+            coroutineScope.launch {
+                textOutput.output(text)
+            }
+        }
+        localAsrClient.onError = { err ->
+            statusMessage = "端侧错误: $err"
+            println("[DEBUG] local asr error: $err")
+            timerJob?.cancel()
+            audioCaptureManager.stopRecording()
+            recognizedText = "识别失败: $err"
+            voiceInputState = VoiceInputState.RESULT
+        }
+
+        localAsrClient.startListening()
+        println("[DEBUG] starting audio recording for local...")
+        val recordingStarted = audioCaptureManager.startRecording()
+        println("[DEBUG] local recording started=$recordingStarted")
+        if (!recordingStarted) {
+            statusMessage = "麦克风启动失败"
+            voiceInputState = VoiceInputState.IDLE
+            isVoiceWindowVisible = false
+            return
+        }
+
+        startRecordingTimer()
     }
 
     fun startAsrPipeline() {
@@ -70,91 +226,23 @@ fun main() = application {
         }
 
         try {
+            val decision = asrRouter.decide(
+                preferences = asrPreferences,
+                isNetworkAvailable = true,
+                networkRttMs = 0,
+                noiseLevel = 0
+            )
+            println("[DEBUG] AsrRouter: ${decision.mode.label} — ${decision.reason}")
+
             isVoiceWindowVisible = true
             voiceInputState = VoiceInputState.LISTENING
             recordingSeconds = 0L
-            statusMessage = "正在聆听..."
-            println("[DEBUG] startAsrPipeline: IDLE -> LISTENING")
+            statusMessage = "${decision.mode.label}: ${decision.reason}"
 
-            audioCaptureManager.onAudioData = { pcmData ->
-                cloudAsrClient.sendAudio(pcmData)
-                val level = pcmData.map { abs(it.toInt()) }.average().toFloat() / 128f
-                audioLevel = level.coerceIn(0f, 1f)
-            }
-            audioCaptureManager.onError = { err ->
-                statusMessage = "音频: $err"
-                println("[DEBUG] audio error: $err")
-            }
-
-            cloudAsrClient.onPartialResult = { text ->
-                partialText = text
-                voiceInputState = VoiceInputState.RECOGNIZING
-                println("[DEBUG] partial: $text")
-            }
-            cloudAsrClient.onFinalResult = { text, confidence ->
-                recognizedText = text
-                voiceInputState = VoiceInputState.RESULT
-                statusMessage = "识别完成"
-                println("[DEBUG] final: $text (confidence=$confidence)")
-                timerJob?.cancel()
-                audioCaptureManager.stopRecording()
-                cloudAsrClient.disconnect()
-                coroutineScope.launch {
-                    textOutput.output(text)
-                }
-            }
-            cloudAsrClient.onConnectionFailed = { err ->
-                statusMessage = "连接失败: $err"
-                voiceInputState = VoiceInputState.IDLE
-                isVoiceWindowVisible = false
-                timerJob?.cancel()
-                audioCaptureManager.stopRecording()
-                println("[DEBUG] connection failed: $err")
-            }
-            cloudAsrClient.onError = { err ->
-                statusMessage = "识别错误: $err"
-                println("[DEBUG] asr error: $err")
-                timerJob?.cancel()
-                audioCaptureManager.stopRecording()
-                cloudAsrClient.disconnect()
-                recognizedText = "识别失败: $err"
-                voiceInputState = VoiceInputState.RESULT
-            }
-            cloudAsrClient.onDisconnected = {
-                println("[DEBUG] ws disconnected, currentState=$voiceInputState")
-                timerJob?.cancel()
-                if (voiceInputState == VoiceInputState.LISTENING || voiceInputState == VoiceInputState.RECOGNIZING) {
-                    audioCaptureManager.stopRecording()
-                    voiceInputState = VoiceInputState.IDLE
-                    statusMessage = "识别超时，请重试"
-                    isVoiceWindowVisible = false
-                }
-            }
-
-            println("[DEBUG] connecting to cloud ASR...")
-            cloudAsrClient.connect()
-            println("[DEBUG] starting audio recording...")
-            val recordingStarted = audioCaptureManager.startRecording()
-            println("[DEBUG] recording started=$recordingStarted")
-            if (!recordingStarted) {
-                statusMessage = "麦克风启动失败"
-                voiceInputState = VoiceInputState.IDLE
-                isVoiceWindowVisible = false
-                return
-            }
-
-            timerJob = coroutineScope.launch {
-                val startTime = System.currentTimeMillis()
-                while (isActive) {
-                    delay(1000)
-                    val elapsed = (System.currentTimeMillis() - startTime) / 1000
-                    recordingSeconds = elapsed
-                    if (elapsed >= MAX_RECORDING_SECONDS.toLong()) {
-                        println("[DEBUG] max timeout reached, stopping...")
-                        finishRecording()
-                        break
-                    }
-                }
+            when (decision.mode) {
+                AsrEngineMode.CLOUD -> startCloudRecognition()
+                AsrEngineMode.LOCAL -> startLocalRecognition()
+                AsrEngineMode.AUTO -> startCloudRecognition()
             }
         } catch (e: Exception) {
             println("[DEBUG] startAsrPipeline exception: ${e.message}")
@@ -170,6 +258,7 @@ fun main() = application {
         timerJob?.cancel()
         audioCaptureManager.stopRecording()
         cloudAsrClient.disconnect()
+        localAsrClient.stopListening()
         isVoiceWindowVisible = false
         voiceInputState = VoiceInputState.IDLE
         recordingSeconds = 0L
@@ -298,6 +387,7 @@ fun main() = application {
                 stopAsrPipeline()
                 hotkeyManager.unregister()
                 cloudAsrClient.release()
+                localAsrClient.release()
                 audioCaptureManager.release()
                 localVocabStore.close()
                 textOutput.release()
