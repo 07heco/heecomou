@@ -13,11 +13,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("export_onnx")
 
-MODEL_ID_DEFAULT = "Qwen/Qwen3-ASR-0.6B"
+MODEL_ID_DEFAULT = "openai/whisper-small"
 OUTPUT_DIR_DEFAULT = "onnx_models"
 SAMPLE_RATE = 16000
 N_MELS = 80
 MAX_SOURCE_POSITIONS = 3000
+MAX_TARGET_POSITIONS = 448
 
 
 class ONNXExporter:
@@ -45,13 +46,14 @@ class ONNXExporter:
             return
 
         torch = self._ensure_torch()
-        from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
+        from transformers import (
+            AutoModelForSpeechSeq2Seq,
+            WhisperProcessor,
+        )
 
         logger.info("Loading model %s on %s...", self.model_id, self.device)
 
-        self._processor = AutoProcessor.from_pretrained(
-            self.model_id, trust_remote_code=True
-        )
+        self._processor = WhisperProcessor.from_pretrained(self.model_id)
 
         torch_dtype = (
             torch.float16 if self.device.startswith("cuda") else torch.float32
@@ -60,7 +62,6 @@ class ONNXExporter:
             self.model_id,
             torch_dtype=torch_dtype,
             low_cpu_mem_usage=True,
-            trust_remote_code=True,
         ).to(self.device)
         self._model.eval()
 
@@ -106,29 +107,32 @@ class ONNXExporter:
     def export_decoder(self) -> str:
         torch = self._ensure_torch()
 
-        decoder = self._model.get_decoder()
-        config = self._model.config
-        hidden_size = config.d_model
+        model_config = self._model.config
+        hidden_size = model_config.d_model
+        vocab_size = model_config.vocab_size
 
         dummy_encoder_hidden = torch.randn(
             1, MAX_SOURCE_POSITIONS, hidden_size, device=self.device
         )
         dummy_input_ids = torch.randint(
-            0, config.vocab_size, (1, 1), device=self.device
+            0, vocab_size, (1, 1), device=self.device
         )
 
-        class DecoderWrapper(torch.nn.Module):
-            def __init__(self, decoder):
+        class WhisperDecoderWrapper(torch.nn.Module):
+            def __init__(self, whisper_model):
                 super().__init__()
-                self.decoder = decoder
+                self.decoder = whisper_model.model.decoder
+                self.proj_out = whisper_model.proj_out
 
             def forward(self, input_ids, encoder_hidden_states):
-                return self.decoder(
+                hidden = self.decoder(
                     input_ids=input_ids,
                     encoder_hidden_states=encoder_hidden_states,
                 ).last_hidden_state
+                logits = self.proj_out(hidden)
+                return logits
 
-        wrapped = DecoderWrapper(decoder)
+        wrapped = WhisperDecoderWrapper(self._model)
         wrapped.eval()
 
         output_path = str(self.output_dir / "decoder.onnx")
@@ -192,22 +196,18 @@ class ONNXExporter:
         return quant_path
 
     def save_tokenizer(self) -> str:
-        output_path = str(self.output_dir / "tokenizer.json")
-
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         if self._processor is not None and hasattr(self._processor, "tokenizer"):
-            tokenizer = self._processor.tokenizer
-            tokenizer.save_pretrained(str(self.output_dir))
-            logger.info("Tokenizer saved to %s", self.output_dir)
+            self._processor.tokenizer.save_pretrained(str(self.output_dir))
+            self._processor.feature_extractor.save_pretrained(str(self.output_dir))
+            logger.info("Tokenizer + feature_extractor saved to %s", self.output_dir)
         else:
-            logger.warning(
-                "Processor/tokenizer not available, "
-                "saving empty tokenizer placeholder"
-            )
-            self.output_dir.mkdir(parents=True, exist_ok=True)
+            logger.warning("Processor not available, saving placeholder")
+            output_path = str(self.output_dir / "tokenizer.json")
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump({"model_id": self.model_id}, f)
 
-        return output_path
+        return str(self.output_dir / "tokenizer.json")
 
     def save_export_info(self, files: dict):
         info = {
@@ -290,7 +290,7 @@ class ONNXExporter:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Export Qwen3-ASR model to ONNX with INT8 quantization"
+        description="Export Whisper model to ONNX with INT8 quantization"
     )
     parser.add_argument(
         "--model-id",

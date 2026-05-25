@@ -126,7 +126,7 @@ class TestSkipQuantize:
 
 class TestConstants:
     def test_model_id_default(self):
-        assert "Qwen3-ASR" in MODEL_ID_DEFAULT
+        assert "whisper" in MODEL_ID_DEFAULT.lower()
 
     def test_sample_rate_config(self):
         from scripts.export_onnx import SAMPLE_RATE
