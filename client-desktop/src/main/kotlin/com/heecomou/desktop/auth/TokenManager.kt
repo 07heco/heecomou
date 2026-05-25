@@ -13,15 +13,30 @@ data class StoredToken(
 
 class TokenManager {
     private val gson = Gson()
-    private val storageFile: File by lazy {
-        val home = System.getProperty("user.home")
-        val dir = File(home, ".heecomou")
-        dir.mkdirs()
-        File(dir, "auth.json")
+    private val storageFile: File
+
+    init {
+        val home = System.getProperty("user.home") ?: System.getProperty("java.io.tmpdir") ?: "."
+        val dotDir = File(home, ".heecomou")
+        if (dotDir.exists() || dotDir.mkdirs()) {
+            storageFile = File(dotDir, "auth.json")
+        } else {
+            val altDir = File(home, "heecomou_data")
+            altDir.mkdirs()
+            storageFile = File(altDir, "auth.json")
+        }
     }
 
     fun save(token: StoredToken) {
-        storageFile.writeText(gson.toJson(token))
+        val parent = storageFile.parentFile
+        if (parent != null && !parent.exists()) {
+            parent.mkdirs()
+        }
+        try {
+            storageFile.writeText(gson.toJson(token))
+        } catch (e: Exception) {
+            throw RuntimeException("无法保存登录信息: ${e.message}", e)
+        }
     }
 
     fun load(): StoredToken? {
@@ -34,7 +49,9 @@ class TokenManager {
     }
 
     fun clear() {
-        storageFile.delete()
+        if (storageFile.exists()) {
+            storageFile.delete()
+        }
     }
 
     fun getAccessToken(): String? {

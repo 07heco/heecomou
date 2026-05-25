@@ -157,23 +157,30 @@ fun LoginWindow(
                                     }
                                 }
                                 if (result == null) {
-                                    errorMessage = "网络连接失败，无法访问服务器"
+                                    errorMessage = "网络连接失败，无法访问服务器 (117.72.201.26:8081)"
                                 } else if (result.code == 200 && result.data != null) {
-                                    tokenManager.save(
-                                        StoredToken(
-                                            accessToken = result.data.accessToken,
-                                            refreshToken = result.data.refreshToken,
-                                            expiresAt = System.currentTimeMillis() + result.data.expiresIn,
-                                            userId = result.data.userId,
-                                            username = result.data.username
+                                    try {
+                                        tokenManager.save(
+                                            StoredToken(
+                                                accessToken = result.data.accessToken,
+                                                refreshToken = result.data.refreshToken,
+                                                expiresAt = System.currentTimeMillis() + result.data.expiresIn,
+                                                userId = result.data.userId,
+                                                username = result.data.username
+                                            )
                                         )
-                                    )
+                                    } catch (ioe: Exception) {
+                                        errorMessage = "登录信息保存失败: ${ioe.message}"
+                                        println("[DEBUG] Token save error: ${ioe.message}")
+                                        return@launch
+                                    }
                                     onLoginSuccess(result.data.username)
                                 } else {
                                     errorMessage = result.message.ifBlank { "操作失败，请重试" }
                                 }
                             } catch (e: Exception) {
-                                errorMessage = "网络错误: ${e.message}"
+                                errorMessage = "网络请求失败: ${e.message}"
+                                println("[DEBUG] Network error: ${e.message}")
                             } finally {
                                 isLoading = false
                             }
