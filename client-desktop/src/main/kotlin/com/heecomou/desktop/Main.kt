@@ -42,7 +42,7 @@ fun main() = application {
     val localAsrClient = remember { LocalAsrClient() }
     val coroutineScope = rememberCoroutineScope()
 
-    var isMainWindowVisible by remember { mutableStateOf(true) }
+    var isMainWindowVisible by remember { mutableStateOf(false) }
     var isVoiceWindowVisible by remember { mutableStateOf(false) }
     var voiceInputState by remember { mutableStateOf(VoiceInputState.IDLE) }
     var recognizedText by remember { mutableStateOf("") }
@@ -298,6 +298,7 @@ fun main() = application {
         if (savedToken != null && tokenManager.getAccessToken() != null) {
             isLoggedIn = true
             loggedInUsername = savedToken.username
+            isMainWindowVisible = true
         } else {
             showLoginWindow = true
         }
@@ -305,21 +306,28 @@ fun main() = application {
 
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
-            try {
-                vocabSyncManager.syncIfNeeded()
-                vocabCount = vocabSyncManager.getLocalWordCount()
-                statusMessage = "词库同步完成 (${vocabCount} 词)"
-            } catch (_: Exception) {
+            val result = vocabSyncManager.syncIfNeeded()
+            vocabCount = result.totalCount
+            if (result.error != null) {
+                statusMessage = "⚠ ${result.error}"
+                println("[DEBUG] SYNC ERROR: ${result.error}")
+            } else if (result.syncedCount > 0) {
+                statusMessage = "词库同步完成 (+${result.syncedCount}新, 共${result.totalCount}词)"
+            } else {
+                statusMessage = "词库已是最新 (共${result.totalCount}词)"
             }
         }
 
         while (isActive) {
             delay(120_000L)
             if (!isLoggedIn) continue
-            try {
-                vocabSyncManager.syncIfNeeded()
-                vocabCount = vocabSyncManager.getLocalWordCount()
-            } catch (_: Exception) {
+            val result = vocabSyncManager.syncIfNeeded()
+            vocabCount = result.totalCount
+            if (result.error != null) {
+                statusMessage = "⚠ ${result.error}"
+                println("[DEBUG] SYNC ERROR: ${result.error}")
+            } else if (result.syncedCount > 0) {
+                statusMessage = "词库同步: +${result.syncedCount}词"
             }
         }
     }
@@ -379,10 +387,12 @@ fun main() = application {
                     isLoggedIn = true
                     loggedInUsername = username
                     showLoginWindow = false
+                    isMainWindowVisible = true
                     statusMessage = "已登录: $username"
                 },
                 onSkip = {
                     showLoginWindow = false
+                    isMainWindowVisible = true
                     statusMessage = "离线模式，词库同步不可用"
                 }
             )

@@ -148,30 +148,35 @@ fun LoginWindow(
                         isLoading = true
                         errorMessage = ""
                         coroutineScope.launch {
-                            val result = withContext(Dispatchers.IO) {
-                                if (isRegisterMode) {
-                                    authApiService.register(username, password, email)
-                                } else {
-                                    authApiService.login(username, password)
+                            try {
+                                val result = withContext(Dispatchers.IO) {
+                                    if (isRegisterMode) {
+                                        authApiService.register(username, password, email)
+                                    } else {
+                                        authApiService.login(username, password)
+                                    }
                                 }
-                            }
-                            if (result == null) {
-                                errorMessage = "网络连接失败，请检查网络后重试"
-                            } else if (result.code == 200 && result.data != null) {
-                                tokenManager.save(
-                                    StoredToken(
-                                        accessToken = result.data.accessToken,
-                                        refreshToken = result.data.refreshToken,
-                                        expiresAt = System.currentTimeMillis() + result.data.expiresIn,
-                                        userId = result.data.userId,
-                                        username = result.data.username
+                                if (result == null) {
+                                    errorMessage = "网络连接失败，无法访问服务器"
+                                } else if (result.code == 200 && result.data != null) {
+                                    tokenManager.save(
+                                        StoredToken(
+                                            accessToken = result.data.accessToken,
+                                            refreshToken = result.data.refreshToken,
+                                            expiresAt = System.currentTimeMillis() + result.data.expiresIn,
+                                            userId = result.data.userId,
+                                            username = result.data.username
+                                        )
                                     )
-                                )
-                                onLoginSuccess(result.data.username)
-                            } else {
-                                errorMessage = result.message.ifBlank { "操作失败，请重试" }
+                                    onLoginSuccess(result.data.username)
+                                } else {
+                                    errorMessage = result.message.ifBlank { "操作失败，请重试" }
+                                }
+                            } catch (e: Exception) {
+                                errorMessage = "网络错误: ${e.message}"
+                            } finally {
+                                isLoading = false
                             }
-                            isLoading = false
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(44.dp),

@@ -4,6 +4,12 @@ import com.heecomou.desktop.network.VocabApiService
 import java.util.logging.Level
 import java.util.logging.Logger
 
+data class SyncResult(
+    val syncedCount: Int,
+    val totalCount: Int,
+    val error: String? = null
+)
+
 class VocabSyncManager(
     private val apiService: VocabApiService,
     private val localStore: LocalVocabStore
@@ -12,31 +18,41 @@ class VocabSyncManager(
         private val LOGGER = Logger.getLogger(VocabSyncManager::class.java.name)
     }
 
-    fun syncIfNeeded(): Boolean {
+    fun syncIfNeeded(): SyncResult {
         return try {
             var currentVersion = localStore.getMaxVersion()
             var syncedCount = 0
 
             while (true) {
                 val response = apiService.sync(currentVersion)
-                if (response?.code == 200 && response.data != null) {
-                    val items = response.data.items
-                    if (items.isNotEmpty()) {
-                        localStore.upsertBatch(items)
-                        syncedCount += items.size
+                if (response == null) {
+                    return SyncResult(syncedCount, localStore.countWords(),
+                        "网络连接失败，无法访问服务器")
+                }
+                if (response.code != 200) {
+                    return SyncResult(syncedCount, localStore.countWords(),
+                        "同步失败: [${response.code}] ${response.message}")
+                }
+                val data = response.data
+                if (data != null) {
+                    if (data.items.isNotEmpty()) {
+                        localStore.upsertBatch(data.items)
+                        syncedCount += data.items.size
                     }
-                    currentVersion = maxOf(currentVersion, response.data.maxVersion)
-                    if (!response.data.hasMore) break
+                    currentVersion = maxOf(currentVersion, data.maxVersion)
+                    if (!data.hasMore) break
                 } else {
                     break
                 }
             }
 
-            LOGGER.info("Sync completed: $syncedCount items synced")
-            syncedCount > 0
+            val total = localStore.countWords()
+            LOGGER.info("Sync completed: $syncedCount new, $total total")
+            SyncResult(syncedCount, total)
         } catch (e: Exception) {
-            LOGGER.log(Level.WARNING, "Sync failed: ${e.message}", e)
-            false
+            LOGGER.log(Level.WARNING, "Sync exception: ${e.message}", e)
+            SyncResult(0, localStore.countWords(),
+                "同步异常: ${e.message}")
         }
     }
 
