@@ -26,3 +26,9 @@ data class VocabListResponse(
     val page: Int,
     val size: Int
 )
+
+data class VocabSyncResponse(
+    val items: List<VocabVO>,
+    @SerializedName("maxVersion") val maxVersion: Long,
+    @SerializedName("hasMore") val hasMore: Boolean = false
+)

@@ -27,6 +27,17 @@ data class AsrSamplesReceived(
     @SerializedName("total_samples") val totalSamples: Int
 )
 
+data class AsrFinalResult(
+    val type: String,
+    val text: String,
+    val confidence: Double
+)
+
+data class AsrPartialResult(
+    val type: String,
+    val text: String
+)
+
 enum class AsrClientState {
     DISCONNECTED,
     CONNECTING,
@@ -48,6 +59,8 @@ class CloudAsrClient(
 
     var onSessionStarted: ((AsrSessionStarted) -> Unit)? = null
     var onSamplesReceived: ((AsrSamplesReceived) -> Unit)? = null
+    var onFinalResult: ((String, Double) -> Unit)? = null
+    var onPartialResult: ((String) -> Unit)? = null
     var onConnectionFailed: ((String) -> Unit)? = null
     var onDisconnected: (() -> Unit)? = null
     var onError: ((String) -> Unit)? = null
@@ -87,6 +100,18 @@ class CloudAsrClient(
                                 )
                                 onSamplesReceived?.invoke(sr)
                             }
+                            "final_result" -> {
+                                val fr = com.google.gson.Gson().fromJson(
+                                    text, AsrFinalResult::class.java
+                                )
+                                onFinalResult?.invoke(fr.text, fr.confidence)
+                            }
+                            "partial_result" -> {
+                                val pr = com.google.gson.Gson().fromJson(
+                                    text, AsrPartialResult::class.java
+                                )
+                                onPartialResult?.invoke(pr.text)
+                            }
                             else -> { /* unknown message type */ }
                         }
                     }
@@ -124,6 +149,8 @@ class CloudAsrClient(
         disconnect()
         onSessionStarted = null
         onSamplesReceived = null
+        onFinalResult = null
+        onPartialResult = null
         onConnectionFailed = null
         onDisconnected = null
         onError = null

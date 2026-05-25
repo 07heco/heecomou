@@ -3,6 +3,7 @@ package com.heecomou.ime.network
 import com.heecomou.ime.model.ApiResponse
 import com.heecomou.ime.model.VocabAddRequest
 import com.heecomou.ime.model.VocabListResponse
+import com.heecomou.ime.model.VocabSyncResponse
 import com.heecomou.ime.model.VocabVO
 import retrofit2.http.*
 
@@ -32,4 +33,7 @@ interface VocabApi {
 
     @GET("api/v1/vocabulary/{id}")
     suspend fun getById(@Path("id") id: Long): ApiResponse<VocabVO>
+
+    @POST("api/v1/vocabulary/sync")
+    suspend fun sync(@Body body: Map<String, @JvmSuppressWildcards Any>): ApiResponse<VocabSyncResponse>
 }

@@ -5,7 +5,6 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.heecomou.ime.model.ApiResponse
-import com.heecomou.ime.model.VocabListResponse
 import com.heecomou.ime.model.VocabVO
 import com.heecomou.ime.network.ApiClient
 import kotlinx.coroutines.Dispatchers
@@ -112,22 +111,37 @@ class VocabSyncManager(
     private val context: Context,
     private val localStore: LocalVocabStore
 ) {
-    suspend fun syncIfNeeded() {
-        val maxVersion = withContext(Dispatchers.IO) {
-            localStore.getMaxVersion()
-        }
+    companion object {
+        private const val TAG = "VocabSyncManager"
+    }
 
-        var hasMore = true
-        var cursor = maxVersion
+    suspend fun syncIfNeeded(): Int {
+        var currentVersion = localStore.getMaxVersion()
+        var syncedCount = 0
 
-        while (hasMore) {
-            val response: ApiResponse<VocabListResponse> = ApiClient.vocabApiService.list(1, 500)
-            response.data?.let { data ->
-                withContext(Dispatchers.IO) {
-                    localStore.upsertBatch(data.items)
+        return try {
+            while (true) {
+                val response = withContext(Dispatchers.IO) {
+                    ApiClient.vocabApiService.sync(
+                        mapOf("version" to currentVersion, "limit" to 500)
+                    )
                 }
-                hasMore = data.items.size >= 500
-            } ?: run { hasMore = false }
+                if (response.code == 200 && response.data != null) {
+                    val items = response.data.items
+                    if (items.isNotEmpty()) {
+                        localStore.upsertBatch(items)
+                        syncedCount += items.size
+                    }
+                    currentVersion = maxOf(currentVersion, response.data.maxVersion)
+                    if (!response.data.hasMore) break
+                } else {
+                    break
+                }
+            }
+            syncedCount
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "Sync failed: ${e.message}", e)
+            syncedCount
         }
     }
 }

@@ -7,16 +7,26 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
+import android.view.inputmethod.InputConnection
 import android.widget.Button
 import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
+import com.heecomou.ime.asr.LocalVocabStore
+import com.heecomou.ime.asr.VocabSyncManager
+import com.heecomou.ime.asr.AsrEngineMode
+import com.heecomou.ime.asr.AsrRouter
+import com.heecomou.ime.asr.LocalAsrClient
 import com.heecomou.ime.audio.AudioCaptureManager
 import com.heecomou.ime.audio.ClientVAD
-import com.heecomou.ime.asr.AsrEngineMode
-import com.heecomou.ime.asr.LocalAsrClient
+import com.heecomou.ime.network.ApiClient
 import com.heecomou.ime.network.asr.CloudAsrClient
 import com.heecomou.ime.ui.voice.VoiceInputPanel
 import com.heecomou.ime.ui.voice.VoiceInputState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
 
 class HeecoMouIME : InputMethodService() {
@@ -24,6 +34,7 @@ class HeecoMouIME : InputMethodService() {
     companion object {
         private const val TAG = "HeecoMouIME"
         private const val MAX_RECORD_MS = 10_000L
+        private const val SYNC_INTERVAL_MS = 120_000L
     }
 
     private lateinit var voiceButton: Button
@@ -37,6 +48,12 @@ class HeecoMouIME : InputMethodService() {
     private var stopRecordingTask: Runnable? = null
     private var vad: ClientVAD? = null
     private var engineMode: AsrEngineMode = AsrEngineMode.AUTO
+
+    private lateinit var vocabStore: LocalVocabStore
+    private var vocabSyncManager: VocabSyncManager? = null
+    private val asrRouter = AsrRouter()
+    private val appScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var syncRunnable: Runnable? = null
 
     fun setEngineMode(mode: AsrEngineMode) {
         engineMode = mode
@@ -52,6 +69,33 @@ class HeecoMouIME : InputMethodService() {
             channelConfig = android.media.AudioFormat.CHANNEL_IN_MONO,
             audioEncoding = android.media.AudioFormat.ENCODING_PCM_16BIT
         )
+
+        vocabStore = LocalVocabStore(this)
+        vocabSyncManager = VocabSyncManager(this, vocabStore)
+
+        appScope.launch {
+            try {
+                val count = vocabSyncManager?.syncIfNeeded() ?: 0
+                Log.d(TAG, "Initial vocab sync: $count words")
+                schedulePeriodicSync()
+            } catch (e: Exception) {
+                Log.w(TAG, "Initial sync failed: ${e.message}")
+            }
+        }
+    }
+
+    private fun schedulePeriodicSync() {
+        syncRunnable = object : Runnable {
+            override fun run() {
+                appScope.launch {
+                    try {
+                        vocabSyncManager?.syncIfNeeded()
+                    } catch (_: Exception) { }
+                }
+                mainHandler.postDelayed(this, SYNC_INTERVAL_MS)
+            }
+        }
+        mainHandler.postDelayed(syncRunnable!!, SYNC_INTERVAL_MS)
     }
 
     override fun onCreateInputView(): View {
@@ -108,10 +152,12 @@ class HeecoMouIME : InputMethodService() {
 
         vad = ClientVAD().apply { reset() }
 
-        if (engineMode == AsrEngineMode.LOCAL) {
-            startLocalRecognition()
-        } else {
-            startCloudRecognition()
+        val resolvedMode = resolveEngineMode()
+        Log.d(TAG, "Resolved engine mode: ${resolvedMode.label}")
+
+        when (resolvedMode) {
+            AsrEngineMode.LOCAL -> startLocalRecognition()
+            AsrEngineMode.CLOUD, AsrEngineMode.AUTO -> startCloudRecognition()
         }
 
         audioCapture.onAudioData = { pcmData ->
@@ -123,7 +169,7 @@ class HeecoMouIME : InputMethodService() {
             }
             val hasSpeech = vad?.detect(shortSamples) ?: true
             if (hasSpeech) {
-                if (engineMode == AsrEngineMode.LOCAL) {
+                if (resolvedMode == AsrEngineMode.LOCAL) {
                     localAsrClient?.feedPcmData(pcmData, true, System.currentTimeMillis())
                 } else {
                     asrClient?.sendAudio(pcmData)
@@ -147,10 +193,38 @@ class HeecoMouIME : InputMethodService() {
         mainHandler.postDelayed(stopRecordingTask!!, MAX_RECORD_MS)
     }
 
+    private fun resolveEngineMode(): AsrEngineMode {
+        return when (engineMode) {
+            AsrEngineMode.CLOUD -> AsrEngineMode.CLOUD
+            AsrEngineMode.LOCAL -> AsrEngineMode.LOCAL
+            AsrEngineMode.AUTO -> {
+                val config = AsrRouter.RoutingConfig(
+                    isOnline = true,
+                    networkType = "wifi",
+                    signalStrength = 1.0f
+                )
+                asrRouter.decide(config).engine
+            }
+        }
+    }
+
     private fun startCloudRecognition() {
         asrClient = CloudAsrClient()
         asrClient?.onSessionStarted = { session ->
             Log.d(TAG, "ASR session started: ${session.sessionId}")
+        }
+        asrClient?.onFinalResult = { text, confidence ->
+            mainHandler.post {
+                commitRecognizedText(text)
+                voicePanel.setState(VoiceInputState.RESULT)
+                voicePanel.setResultText(text)
+                bumpUsedWords(text)
+            }
+        }
+        asrClient?.onPartialResult = { text ->
+            mainHandler.post {
+                voicePanel.setState(VoiceInputState.RECOGNIZING)
+            }
         }
         asrClient?.onError = { error ->
             mainHandler.post {
@@ -167,8 +241,10 @@ class HeecoMouIME : InputMethodService() {
         }
         localAsrClient?.onFinalResult = { text ->
             mainHandler.post {
+                commitRecognizedText(text)
                 voicePanel.setState(VoiceInputState.RESULT)
                 voicePanel.setResultText(text)
+                bumpUsedWords(text)
             }
         }
         localAsrClient?.onError = { error ->
@@ -178,6 +254,27 @@ class HeecoMouIME : InputMethodService() {
         }
         localAsrClient?.initialize()
         localAsrClient?.startListening()
+    }
+
+    private fun commitRecognizedText(text: String) {
+        val ic: InputConnection? = currentInputConnection
+        if (ic != null) {
+            ic.commitText(text, 1)
+            Log.d(TAG, "Committed text: ${text.take(30)}")
+        } else {
+            Log.w(TAG, "No InputConnection, text not committed")
+        }
+    }
+
+    private fun bumpUsedWords(text: String) {
+        if (text.isBlank()) return
+        val words = text.replace(Regex("[^\\u4e00-\\u9fff\\w]"), " ").split("\\s+".toRegex())
+            .filter { it.length >= 2 }
+        for (w in words) {
+            try {
+                vocabStore.bumpFrequency(w)
+            } catch (_: Exception) { }
+        }
     }
 
     private fun stopVoiceInput() {
@@ -197,8 +294,10 @@ class HeecoMouIME : InputMethodService() {
 
         voicePanel.setState(VoiceInputState.RECOGNIZING)
         mainHandler.postDelayed({
-            voicePanel.setState(VoiceInputState.IDLE)
-            voiceButton.text = "语音输入"
+            if (!isRecording) {
+                voicePanel.setState(VoiceInputState.IDLE)
+                voiceButton.text = "语音输入"
+            }
         }, 1500)
     }
 
@@ -218,11 +317,14 @@ class HeecoMouIME : InputMethodService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        mainHandler.removeCallbacks(syncRunnable ?: return)
         audioCapture.release()
         asrClient?.disconnect()
         asrClient = null
         localAsrClient?.release()
         localAsrClient = null
         ioExecutor.shutdown()
+        vocabStore.close()
+        appScope.cancel()
     }
 }
