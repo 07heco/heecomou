@@ -20,6 +20,8 @@ import com.heecomou.desktop.ui.FloatingVoiceWindow
 import com.heecomou.desktop.ui.TextOutputManager
 import com.heecomou.desktop.asr.LocalAsrState
 import com.heecomou.desktop.ui.VoiceInputState
+import com.heecomou.desktop.auth.TokenManager
+import com.heecomou.desktop.ui.LoginWindow
 import com.heecomou.desktop.vocab.LocalVocabStore
 import com.heecomou.desktop.vocab.VocabSyncManager
 import kotlinx.coroutines.*
@@ -30,7 +32,8 @@ private const val MAX_RECORDING_SECONDS = 60
 fun main() = application {
     val hotkeyManager = remember { GlobalHotkeyManager() }
     val textOutput = remember { TextOutputManager() }
-    val vocabApiService = remember { VocabApiService() }
+    val tokenManager = remember { TokenManager() }
+    val vocabApiService = remember { VocabApiService(tokenProvider = { tokenManager.getAccessToken() }) }
     val localVocabStore = remember { LocalVocabStore() }
     val vocabSyncManager = remember { VocabSyncManager(vocabApiService, localVocabStore) }
     val asrRouter = remember { AsrRouter() }
@@ -52,6 +55,9 @@ fun main() = application {
     var recordingSeconds by remember { mutableStateOf(0L) }
     var maxSeconds by remember { mutableStateOf(MAX_RECORDING_SECONDS) }
     var timerJob by remember { mutableStateOf<Job?>(null) }
+    var isLoggedIn by remember { mutableStateOf(false) }
+    var loggedInUsername by remember { mutableStateOf("") }
+    var showLoginWindow by remember { mutableStateOf(false) }
 
     fun bumpUsedWords(text: String) {
         if (text.isBlank()) return
@@ -288,21 +294,32 @@ fun main() = application {
         hotkeyManager.onCancelTriggered = { stopAsrPipeline() }
         hotkeyManager.register()
 
-        coroutineScope.launch {
+        val savedToken = tokenManager.load()
+        if (savedToken != null && tokenManager.getAccessToken() != null) {
+            isLoggedIn = true
+            loggedInUsername = savedToken.username
+        } else {
+            showLoginWindow = true
+        }
+    }
+
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
             try {
                 vocabSyncManager.syncIfNeeded()
                 vocabCount = vocabSyncManager.getLocalWordCount()
                 statusMessage = "词库同步完成 (${vocabCount} 词)"
             } catch (_: Exception) {
             }
+        }
 
-            while (isActive) {
-                delay(120_000L)
-                try {
-                    vocabSyncManager.syncIfNeeded()
-                    vocabCount = vocabSyncManager.getLocalWordCount()
-                } catch (_: Exception) {
-                }
+        while (isActive) {
+            delay(120_000L)
+            if (!isLoggedIn) continue
+            try {
+                vocabSyncManager.syncIfNeeded()
+                vocabCount = vocabSyncManager.getLocalWordCount()
+            } catch (_: Exception) {
             }
         }
     }
@@ -345,6 +362,33 @@ fun main() = application {
         }
     }
 
+    if (showLoginWindow) {
+        Window(
+            onCloseRequest = { },
+            title = "HeecoMou - 登录",
+            state = rememberWindowState(
+                width = 420.dp,
+                height = 480.dp,
+                position = WindowPosition(Alignment.Center)
+            ),
+            resizable = false
+        ) {
+            LoginWindow(
+                tokenManager = tokenManager,
+                onLoginSuccess = { username ->
+                    isLoggedIn = true
+                    loggedInUsername = username
+                    showLoginWindow = false
+                    statusMessage = "已登录: $username"
+                },
+                onSkip = {
+                    showLoginWindow = false
+                    statusMessage = "离线模式，词库同步不可用"
+                }
+            )
+        }
+    }
+
     if (isMainWindowVisible) {
         Window(
             onCloseRequest = { isMainWindowVisible = false },
@@ -376,7 +420,7 @@ fun main() = application {
                     StatusRow("热键", if (hotkeyManager.isRegistered()) "\u2705 已注册" else "\u274C 未注册")
                     StatusRow("音频", if (audioCaptureManager.isSupported()) "\u2705 可用" else "\u26A0\uFE0F 不可用")
                     StatusRow("词库", "${vocabCount} 词")
-                    StatusRow("最长录音", "${maxSeconds} 秒")
+                    StatusRow("账号", if (isLoggedIn) "\u2705 ${loggedInUsername}" else "\u26A0\uFE0F 未登录")
                     StatusRow("模式", asrPreferences.engineMode.label)
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -405,6 +449,30 @@ fun main() = application {
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(asrPreferences.engineMode.label)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TextButton(
+                            onClick = {
+                                if (isLoggedIn) {
+                                    tokenManager.clear()
+                                    isLoggedIn = false
+                                    loggedInUsername = ""
+                                    vocabCount = 0
+                                    statusMessage = "已登出"
+                                } else {
+                                    showLoginWindow = true
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (isLoggedIn) "登出" else "登录")
                         }
                     }
                 }
