@@ -1,26 +1,5 @@
 # HeecoMou — 智能语音输入法
 
-## 目录
-
-1. [项目概述](#1-项目概述)
-2. [核心需求](#2-核心需求)
-3. [系统架构](#3-系统架构)
-4. [组件技术栈与依赖](#4-组件技术栈与依赖)
-   - [4.1 Gateway (Go 语音网关)](#41-gateway-go-语音网关)
-   - [4.2 Backend (Java 业务后端)](#42-backend-java-业务后端)
-   - [4.3 ASR (Python 语音识别引擎)](#43-asr-python-语音识别引擎)
-   - [4.4 Frontend (React Web 管理后台)](#44-frontend-react-web-管理后台)
-   - [4.5 Desktop Client (Compose Desktop)](#45-desktop-client-compose-desktop)
-   - [4.6 Android Client (Android IME)](#46-android-client-android-ime)
-5. [数据库设计](#5-数据库设计)
-6. [API 接口清单](#6-api-接口清单)
-7. [原创功能与第三方库对照](#7-原创功能与第三方库对照)
-8. [核心功能说明](#8-核心功能说明)
-9. [部署方式](#9-部署方式)
-10. [构建与运行](#10-构建与运行)
-
-***
-
 ## 1. 项目概述
 
 **HeecoMou** 是一个面向中文用户的**智能语音输入法系统**，支持云端高精度 ASR 与端侧离线推理双引擎，提供词库管理、语音识别文本纠错、多端（桌面客户端 + Android 输入法 + Web 管理后台）同步等功能。
@@ -53,12 +32,10 @@
 
 ***
 
-## 3. 产品需求与用户场景
 
+## 3. 系统架构
 
-## 4. 系统架构
-
-### 4.1 组件部署拓扑
+### 3.1 组件部署拓扑
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -107,7 +84,7 @@
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 语音识别完整链路
+### 3.2 语音识别完整链路
 
 ```
 客户端麦克风 → PCM 音频流 → WebSocket → Gateway (:8080)
@@ -122,7 +99,7 @@
               └── 识别文本 → WebSocket 回传 → 客户端展示
 ```
 
-### 4.3 ASR 引擎路由策略
+### 3.3 ASR 引擎路由策略
 
 | 优先级     | 条件                          | 决策         |
 | ------- | --------------------------- | ---------- |
@@ -132,7 +109,7 @@
 | Level 4 | WiFi > 0.7 或以太网 + 噪音 < 50dB | **云端高精度**  |
 | Level 5 | 默认                          | **云端高精度**  |
 
-### 4.4 数据流向
+### 3.4 数据流向
 
 ```
 用户注册/登录 → Backend 验证密码 → 签发 JWT (accessToken + refreshToken)
@@ -148,9 +125,9 @@
 
 ***
 
-## 5. 组件技术栈与依赖
+## 4. 组件技术栈与依赖
 
-### 5.1 Gateway (Go 语音网关)
+### 4.1 Gateway (Go 语音网关)
 
 | 属性        | 值                            |
 | --------- | ---------------------------- |
@@ -175,7 +152,7 @@
 
 ***
 
-### 5.2 Backend (Java 业务后端)
+### 4.2 Backend (Java 业务后端)
 
 | 属性     | 值                                    |
 | ------ | ------------------------------------ |
@@ -205,7 +182,7 @@
 
 ***
 
-### 5.3 ASR (Python 语音识别引擎)
+### 4.3 ASR (Python 语音识别引擎)
 
 | 属性     | 值                                              |
 | ------ | ---------------------------------------------- |
@@ -250,7 +227,7 @@
 
 ***
 
-### 5.4 Frontend (React Web 管理后台)
+### 4.4 Frontend (React Web 管理后台)
 
 | 属性    | 值                         |
 | ----- | ------------------------- |
@@ -297,7 +274,7 @@
 
 ***
 
-### 5.5 Desktop Client (Compose Desktop)
+### 4.5 Desktop Client (Compose Desktop)
 
 | 属性    | 值                                     |
 | ----- | ------------------------------------- |
@@ -341,7 +318,7 @@
 
 ***
 
-### 5.6 Android Client (Android IME)
+### 4.6 Android Client (Android IME)
 
 | 属性                 | 值                                          |
 | ------------------ | ------------------------------------------ |
@@ -384,11 +361,11 @@
 ***
 
 
-## 6. 多技术栈选型理由
+## 5. 多技术栈选型理由
 
 HeecoMou 采用了 **Go + Java + Kotlin + Python + TypeScript** 五种编程语言组合开发，这不是随意堆砌，而是基于各技术栈的核心优势、擅长领域，进行**优势互补、各司其职**的工程决策。
 
-### 6.1 选型全景
+### 5.1 选型全景
 
 | 技术栈 | 组件 | 擅长领域 | 在本项目承担的角色 |
 |--------|------|---------|------------------|
@@ -399,7 +376,7 @@ HeecoMou 采用了 **Go + Java + Kotlin + Python + TypeScript** 五种编程语�
 | **Kotlin (Compose)** | Desktop Client | JVM 跨平台、声明式 UI、系统级 API 调用 | Windows 桌面客户端，快捷键体系、音频设备操控 |
 | **Kotlin (Android)** | Android IME | Android 原生支持、ONNX Runtime 移动端推理 | Android 输入法，端侧 AI 推理 |
 
-### 6.2 逐技术栈深入分析
+### 5.2 逐技术栈深入分析
 
 #### Go — 语音网关（高并发网关层）
 
@@ -468,7 +445,7 @@ HeecoMou 采用了 **Go + Java + Kotlin + Python + TypeScript** 五种编程语�
 
 **解决的问题：** Android 端侧离线语音识别 + 系统级输入法集成。
 
-### 6.3 技术栈协同优势
+### 5.3 技术栈协同优势
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -494,7 +471,7 @@ HeecoMou 采用了 **Go + Java + Kotlin + Python + TypeScript** 五种编程语�
 3. **Kotlin Desktop ↔ Kotlin Android**：共享 ASR 路由逻辑和词库同步协议，两端代码可以相互参考实现
 4. **Python ASR ↔ Java Backend**：ASR 推理完成后，Python 通过 `VocabInjector` 调用 Java Backend 的词库 API 获取热词，实现推理结果的质量增强
 
-### 6.4 如果单一技术栈会怎样
+### 5.4 如果单一技术栈会怎样
 
 | 如果全用... | 最大的损失 |
 |------------|----------|
@@ -509,9 +486,9 @@ HeecoMou 采用了 **Go + Java + Kotlin + Python + TypeScript** 五种编程语�
 
 ---
 
-## 7. 数据库设计
+## 6. 数据库设计
 
-### 7.1 user 表
+### 6.1 user 表
 
 ```sql
 CREATE TABLE user (
@@ -527,7 +504,7 @@ CREATE TABLE user (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-### 7.2 vocabulary 表
+### 6.2 vocabulary 表
 
 ```sql
 CREATE TABLE vocabulary (
@@ -546,7 +523,7 @@ CREATE TABLE vocabulary (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-### 7.3 correction\_history 表
+### 6.3 correction\_history 表
 
 ```sql
 CREATE TABLE correction_history (
@@ -565,17 +542,17 @@ CREATE TABLE correction_history (
 
 ***
 
-## 8. API 接口清单
+## 7. API 接口清单
 
 所有 API 路径统一以 `/api/v1` 为前缀，JWT Bearer Token 鉴权。
 
-### 8.1 健康检查
+### 7.1 健康检查
 
 | 方法  | 路径               | 鉴权 | 说明                 |
 | --- | ---------------- | -- | ------------------ |
 | GET | `/api/v1/health` | 无需 | 后端 + DB + Redis 状态 |
 
-### 8.2 认证模块 (Auth)
+### 7.2 认证模块 (Auth)
 
 | 方法   | 路径                      | 鉴权 | 限流      | 说明             |
 | ---- | ----------------------- | -- | ------- | -------------- |
@@ -584,7 +561,7 @@ CREATE TABLE correction_history (
 | POST | `/api/v1/auth/refresh`  | 需  | 无       | 刷新 Token       |
 | POST | `/api/v1/auth/logout`   | 需  | 无       | 登出（Token 入黑名单） |
 
-### 8.3 用户模块 (User)
+### 7.3 用户模块 (User)
 
 | 方法  | 路径                      | 鉴权 | 说明       |
 | --- | ----------------------- | -- | -------- |
@@ -592,7 +569,7 @@ CREATE TABLE correction_history (
 | PUT | `/api/v1/user/profile`  | 需  | 更新个人资料   |
 | PUT | `/api/v1/user/password` | 需  | 修改密码     |
 
-### 8.4 词库模块 (Vocabulary)
+### 7.4 词库模块 (Vocabulary)
 
 | 方法     | 路径                          | 鉴权 | 限流      | 说明                          |
 | ------ | --------------------------- | -- | ------- | --------------------------- |
@@ -604,14 +581,14 @@ CREATE TABLE correction_history (
 | DELETE | `/api/v1/vocabulary/{id}`   | 需  | 无       | 删除词汇                        |
 | POST   | `/api/v1/vocabulary/sync`   | 需  | 无       | 增量同步 (version, limit)       |
 
-### 8.5 纠错模块 (Correction)
+### 7.5 纠错模块 (Correction)
 
 | 方法   | 路径                    | 鉴权 | 说明     |
 | ---- | --------------------- | -- | ------ |
 | GET  | `/api/v1/corrections` | 需  | 纠错历史列表 |
 | POST | `/api/v1/corrections` | 需  | 提交纠错记录 |
 
-### 8.6 网关 API (非业务接口)
+### 7.6 网关 API (非业务接口)
 
 | 方法        | 路径              | 端口   | 说明         |
 | --------- | --------------- | ---- | ---------- |
@@ -621,9 +598,9 @@ CREATE TABLE correction_history (
 
 ***
 
-## 9. 原创功能与第三方库对照
+## 8. 原创功能与第三方库对照
 
-### 9.1 第三方库 / 框架（非原创）
+### 8.1 第三方库 / 框架（非原创）
 
 | 库 / 框架                   | 所在组件                            | 用途                 |
 | ------------------------ | ------------------------------- | ------------------ |
@@ -654,7 +631,7 @@ CREATE TABLE correction_history (
 | Kotlin Coroutines 1.7.3  | client-android                  | 异步协程框架             |
 | AndroidX                 | client-android                  | Android 官方支持库      |
 
-### 9.2 原创功能模块
+### 8.2 原创功能模块
 
 | 模块                     | 所在组件                           | 原创内容                                                                                |
 | ---------------------- | ------------------------------ | ----------------------------------------------------------------------------------- |
@@ -675,9 +652,9 @@ CREATE TABLE correction_history (
 
 ***
 
-## 10. 核心功能说明
+## 9. 核心功能说明
 
-### 10.1 用户认证与授权 (JWT + Security)
+### 9.1 用户认证与授权 (JWT + Security)
 
 - 用户注册：BCryptPasswordEncoder 加密密码存储 → 返回 accessToken + refreshToken
 - 用户登录：验证密码 → 生成双 Token → Redis 记录 refreshToken
@@ -685,7 +662,7 @@ CREATE TABLE correction_history (
 - 登出：accessToken 加入 Redis 黑名单 → 吊销所有 refreshToken
 - 认证过滤器：`JwtAuthenticationFilter` 拦截所有请求，校验 Bearer Token 的有效性和黑名单状态
 
-### 10.2 词库增量同步协议
+### 9.2 词库增量同步协议
 
 ```
 客户端                           服务端
@@ -702,7 +679,7 @@ CREATE TABLE correction_history (
   └── 本地 SQLite INSERT OR REPLACE 写入
 ```
 
-### 10.3 纠错反馈闭环
+### 9.3 纠错反馈闭环
 
 ```
 语音识别 → 原始文本展示
@@ -714,7 +691,7 @@ CREATE TABLE correction_history (
         纠错数据聚合 → 更新词库优先级 → 反馈到 ASR 词库提升准确率
 ```
 
-### 10.4 接口限流机制
+### 9.4 接口限流机制
 
 - 实现方式：Spring AOP + `@RateLimit` 注解 + Redis Lua 脚本
 - 算法：令牌桶 (Token Bucket)，Redis 原子性保证
@@ -724,9 +701,9 @@ CREATE TABLE correction_history (
 
 ***
 
-## 11. 部署方式
+## 10. 部署方式
 
-### 11.1 基础设施
+### 10.1 基础设施
 
 ```bash
 # 启动 MySQL + Redis
@@ -738,7 +715,7 @@ docker compose -f docker-compose.yml up -d
 | MySQL 8.0 | heecomou-mysql | 3306 (映射 13306) | root / heecomou123 |
 | Redis 7   | heecomou-redis | 6379            | (无密码)              |
 
-### 11.2 部署辅助脚本 (`scripts/`)
+### 10.2 部署辅助脚本 (`scripts/`)
 
 | 脚本                     | 说明                                 |
 | ---------------------- | ---------------------------------- |
@@ -750,7 +727,7 @@ docker compose -f docker-compose.yml up -d
 | `e2e-test.sh`          | 端到端全链路测试                           |
 | `dual-platform-e2e.sh` | Desktop + Android 双平台 E2E 测试       |
 
-### 11.3 环境变量
+### 10.3 环境变量
 
 | 变量                 | 作用              | 默认值                     |
 | ------------------ | --------------- | ----------------------- |
@@ -763,9 +740,9 @@ docker compose -f docker-compose.yml up -d
 
 ***
 
-## 12. 构建与运行
+## 11. 构建与运行
 
-### 12.1 前置环境
+### 11.1 前置环境
 
 | 环境      | 最低版本                 |
 | ------- | -------------------- |
@@ -777,7 +754,7 @@ docker compose -f docker-compose.yml up -d
 | Gradle  | 8.5+ (wrapper 自带)    |
 | Docker  | 20+ (仅基础设施)          |
 
-### 12.2 构建命令
+### 11.2 构建命令
 
 ```bash
 # === Backend (Java) ===
@@ -811,7 +788,7 @@ cd client-android
 ./gradlew assembleDebug   # Debug APK
 ```
 
-### 12.3 运行测试
+### 11.3 运行测试
 
 ```bash
 # Backend
@@ -833,18 +810,20 @@ cd client-desktop && ./gradlew test
 cd client-android && ./gradlew test
 ```
 
+
+
+
+***
+
+## 12. Demo 视频
+
+HeecoMou 功能演示视频：[《HeecoMou Demo 视频》](https://www.yuque.com/u49119058/azmmfs/xyftrcv2gueqwf8o?singleDoc#)
+
+> 点击上方链接查看 HeecoMou 产品的完整功能演示，包含语音输入、词库管理、纠错反馈等核心流程。
+
 ***
 
 > 本文档由 HeecoMou 开发团队维护，随项目迭代持续更新。
 
 
 ***
-
-
-***
-
-## 13. Demo 视频
-
-HeecoMou 功能演示视频：[《HeecoMou Demo 视频》](https://www.yuque.com/u49119058/azmmfs/xyftrcv2gueqwf8o?singleDoc#)
-
-> 点击上方链接查看 HeecoMou 产品的完整功能演示，包含语音输入、词库管理、纠错反馈等核心流程。
