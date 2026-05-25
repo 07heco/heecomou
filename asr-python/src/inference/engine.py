@@ -135,7 +135,7 @@ class ASREngine:
         if not self._loaded:
             raise RuntimeError("Model not loaded. Call load() first.")
 
-        torch = self._ensure_torch()
+        self._ensure_torch()
         audio_np, sample_rate = self._decode_audio(audio_b64)
 
         start_time = time.time()
