@@ -38,3 +38,18 @@ data class VocabSyncResponse(
     @SerializedName("maxVersion") val maxVersion: Long,
     @SerializedName("hasMore") val hasMore: Boolean = false
 )
+
+data class CorrectionRequest(
+    val originalText: String,
+    val correctedText: String,
+    val source: String = "desktop"
+)
+
+data class CorrectionHistory(
+    val id: Long,
+    val userId: Long,
+    val originalText: String,
+    val correctedText: String,
+    val source: String,
+    val createdAt: String
+)

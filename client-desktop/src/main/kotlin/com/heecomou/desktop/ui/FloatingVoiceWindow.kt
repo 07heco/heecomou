@@ -34,7 +34,8 @@ fun FrameWindowScope.FloatingVoiceWindow(
     audioLevel: Float,
     recordingSeconds: Long,
     maxSeconds: Int,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onSubmitCorrection: (originalText: String, correctedText: String) -> Unit
 ) {
     val isActive = state == VoiceInputState.LISTENING || state == VoiceInputState.RECOGNIZING
     val animatedLevel by animateFloatAsState(
@@ -62,7 +63,7 @@ fun FrameWindowScope.FloatingVoiceWindow(
                     maxSeconds = maxSeconds
                 )
                 VoiceInputState.RECOGNIZING -> RecognizingContent(partialText)
-                VoiceInputState.RESULT -> ResultContent(recognizedText, onDismiss)
+                VoiceInputState.RESULT -> ResultContent(recognizedText, onDismiss, onSubmitCorrection)
             }
         }
     }
@@ -205,7 +206,15 @@ private fun RecognizingContent(partialText: String) {
 }
 
 @Composable
-private fun ResultContent(text: String, onDismiss: () -> Unit) {
+private fun ResultContent(
+    originalText: String,
+    onDismiss: () -> Unit,
+    onSubmitCorrection: (originalText: String, correctedText: String) -> Unit
+) {
+    var editedText by remember { mutableStateOf(originalText) }
+    var submitted by remember { mutableStateOf(false) }
+    val hasChanges = editedText != originalText && !submitted
+
     Spacer(modifier = Modifier.height(4.dp))
 
     Text(
@@ -220,32 +229,76 @@ private fun ResultContent(text: String, onDismiss: () -> Unit) {
         fontWeight = FontWeight.Medium
     )
 
-    if (text.isNotEmpty()) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = Color.White.copy(alpha = 0.1f),
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Text(
-                text = text,
+    if (originalText.isNotEmpty()) {
+        OutlinedTextField(
+            value = editedText,
+            onValueChange = { if (!submitted) editedText = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp, max = 96.dp),
+            textStyle = androidx.compose.ui.text.TextStyle(
                 color = Color.White,
                 fontSize = 14.sp,
-                modifier = Modifier.padding(12.dp),
                 lineHeight = 20.sp
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF4A90D9),
+                unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                cursorColor = Color(0xFF4A90D9)
+            ),
+            maxLines = 3,
+            singleLine = false
+        )
+
+        if (hasChanges) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "\u270F\uFE0F 文本已修改，可提交纠错",
+                color = Color(0xFFF39C12),
+                fontSize = 11.sp
             )
         }
     }
 
     Spacer(modifier = Modifier.height(8.dp))
 
-    Button(
-        onClick = onDismiss,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF4A90D9)
-        ),
-        shape = RoundedCornerShape(8.dp)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
-        Text("关闭", fontSize = 13.sp)
+        if (hasChanges) {
+            Button(
+                onClick = {
+                    onSubmitCorrection(originalText, editedText)
+                    submitted = true
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFE67E22)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("提交纠错", fontSize = 13.sp)
+            }
+        }
+
+        Button(
+            onClick = onDismiss,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF4A90D9)
+            ),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text("关闭", fontSize = 13.sp)
+        }
+    }
+
+    if (submitted) {
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "\u2714\uFE0F 纠错已提交",
+            color = Color(0xFF2ECC71),
+            fontSize = 12.sp
+        )
     }
 }
 

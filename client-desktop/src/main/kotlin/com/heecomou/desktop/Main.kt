@@ -15,6 +15,7 @@ import com.heecomou.desktop.audio.AudioCaptureManager
 import com.heecomou.desktop.asr.*
 import com.heecomou.desktop.hotkey.GlobalHotkeyManager
 import com.heecomou.desktop.network.VocabApiService
+import com.heecomou.desktop.network.CorrectionRequest
 import com.heecomou.desktop.ui.FloatingVoiceWindow
 import com.heecomou.desktop.ui.TextOutputManager
 import com.heecomou.desktop.asr.LocalAsrState
@@ -42,6 +43,7 @@ fun main() = application {
     var isVoiceWindowVisible by remember { mutableStateOf(false) }
     var voiceInputState by remember { mutableStateOf(VoiceInputState.IDLE) }
     var recognizedText by remember { mutableStateOf("") }
+    var originalAsrText by remember { mutableStateOf("") }
     var partialText by remember { mutableStateOf("") }
     var audioLevel by remember { mutableStateOf(0f) }
     var asrPreferences by remember { mutableStateOf(AsrPreferences()) }
@@ -108,6 +110,7 @@ fun main() = application {
         }
         cloudAsrClient.onFinalResult = { text, confidence ->
             recognizedText = text
+            originalAsrText = text
             voiceInputState = VoiceInputState.RESULT
             statusMessage = "云端识别完成"
             println("[DEBUG] final: $text (confidence=$confidence)")
@@ -194,6 +197,7 @@ fun main() = application {
         }
         localAsrClient.onFinalResult = { text ->
             recognizedText = text
+            originalAsrText = text
             voiceInputState = VoiceInputState.RESULT
             statusMessage = "端侧识别完成"
             println("[DEBUG] local final: $text")
@@ -324,7 +328,19 @@ fun main() = application {
                 audioLevel = audioLevel,
                 recordingSeconds = recordingSeconds,
                 maxSeconds = maxSeconds,
-                onDismiss = { stopAsrPipeline() }
+                onDismiss = { stopAsrPipeline() },
+                onSubmitCorrection = { original, corrected ->
+                    coroutineScope.launch {
+                        val result = vocabApiService.submitCorrection(
+                            CorrectionRequest(originalText = original, correctedText = corrected, source = "desktop")
+                        )
+                        if (result != null && result.code == 200) {
+                            println("[DEBUG] correction submitted: '$original' -> '$corrected'")
+                        } else {
+                            println("[DEBUG] correction submission failed")
+                        }
+                    }
+                }
             )
         }
     }

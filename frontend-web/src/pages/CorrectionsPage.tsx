@@ -8,6 +8,11 @@ export default function CorrectionsPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
+  const [originalText, setOriginalText] = useState('');
+  const [correctedText, setCorrectedText] = useState('');
+  const [source, setSource] = useState('web');
+  const [submitting, setSubmitting] = useState(false);
+
   const fetchList = useCallback(async () => {
     setLoading(true);
     try {
@@ -25,6 +30,30 @@ export default function CorrectionsPage() {
   useEffect(() => {
     fetchList();
   }, [fetchList]);
+
+  const handleSubmit = async () => {
+    if (!originalText.trim() || !correctedText.trim()) return;
+    setSubmitting(true);
+    try {
+      const res = await correctionApi.submit({
+        originalText: originalText.trim(),
+        correctedText: correctedText.trim(),
+        source,
+      });
+      if (res.data.code === 200) {
+        setMessage('纠错已提交');
+        setOriginalText('');
+        setCorrectedText('');
+        fetchList();
+      } else {
+        setMessage(res.data.message || '提交失败');
+      }
+    } catch {
+      setMessage('提交纠错失败');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="animate-fade-in">
@@ -48,6 +77,54 @@ export default function CorrectionsPage() {
           <button onClick={() => setMessage('')} className="ml-3 float-right">&times;</button>
         </div>
       )}
+
+      <div className="card mb-6 p-5">
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          提交新纠错
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">原始错误文本</label>
+            <input
+              className="input w-full"
+              placeholder="ASR 识别的错误文本"
+              value={originalText}
+              onChange={(e) => setOriginalText(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">纠正后文本</label>
+            <input
+              className="input w-full"
+              placeholder="正确的文本"
+              value={correctedText}
+              onChange={(e) => setCorrectedText(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">来源</label>
+            <select
+              className="input w-full"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+            >
+              <option value="web">Web 管理后台</option>
+              <option value="mobile">移动端</option>
+              <option value="desktop">桌面端</option>
+              <option value="keyboard">键盘输入</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              className="btn btn-primary w-full"
+              onClick={handleSubmit}
+              disabled={submitting || !originalText.trim() || !correctedText.trim()}
+            >
+              {submitting ? '提交中...' : '提交纠错'}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="card overflow-hidden">
         {loading ? (

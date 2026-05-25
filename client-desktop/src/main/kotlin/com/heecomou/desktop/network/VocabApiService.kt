@@ -56,6 +56,11 @@ class VocabApiService(
         return executePost(url, body, object : TypeToken<ApiResponse<VocabSyncResponse>>() {})
     }
 
+    fun submitCorrection(request: CorrectionRequest): ApiResponse<CorrectionHistory>? {
+        val url = "$baseUrl/api/v1/corrections"
+        return executePost(url, request, object : TypeToken<ApiResponse<CorrectionHistory>>() {})
+    }
+
     private inline fun <reified T> executeGet(url: String, typeToken: TypeToken<T>): T? {
         val requestBuilder = Request.Builder().url(url).get()
         val token = tokenProvider()
