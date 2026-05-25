@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HeecoMou API 接口文档</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f5f5f7;
+      color: #1d1d1f;
+      line-height: 1.6;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+    header {
+      text-align: center;
+      padding: 48px 0 40px;
+      border-bottom: 1px solid #d2d2d7;
+      margin-bottom: 40px;
+    }
+    header h1 { font-size: 2rem; font-weight: 700; color: #1d1d1f; }
+    header p { color: #6e6e73; margin-top: 8px; font-size: 0.95rem; }
+    .overview {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 40px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .overview h2 { font-size: 1.25rem; margin-bottom: 16px; }
+    .overview table { width: 100%; border-collapse: collapse; }
+    .overview td { padding: 8px 12px 8px 0; vertical-align: top; }
+    .overview td:first-child { font-weight: 600; color: #6e6e73; white-space: nowrap; width: 120px; }
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .badge-get { background: #e8f5e9; color: #2e7d32; }
+    .badge-post { background: #e3f2fd; color: #1565c0; }
+    .badge-put { background: #fff3e0; color: #e65100; }
+    .badge-delete { background: #fce4ec; color: #c62828; }
+    .badge-auth { background: #f3e5f5; color: #7b1fa2; }
+    .badge-public { background: #e8f5e9; color: #2e7d32; }
+    .section { margin-bottom: 40px; }
+    .section h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #0071e3;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section h2 .icon { font-size: 1.4rem; }
+    .endpoint {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      border-left: 4px solid #0071e3;
+    }
+    .endpoint.post { border-left-color: #1565c0; }
+    .endpoint.put { border-left-color: #e65100; }
+    .endpoint.delete { border-left-color: #c62828; }
+    .endpoint .ep-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .endpoint .ep-method { font-weight: 700; font-size: 0.85rem; text-transform: uppercase; }
+    .endpoint .ep-path {
+      font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #1d1d1f;
+    }
+    .endpoint .ep-desc {
+      color: #6e6e73;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+    }
+    .endpoint .props { margin-top: 12px; }
+    .endpoint .props h4 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #6e6e73;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .endpoint .props pre {
+      background: #f5f5f7;
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.83rem;
+      overflow-x: auto;
+      color: #1d1d1f;
+      line-height: 1.7;
+    }
+    .endpoint .resp {
+      margin-top: 12px;
+      color: #0071e3;
+      font-size: 0.83rem;
+      font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    }
+    footer {
+      text-align: center;
+      padding: 32px 0;
+      color: #86868b;
+      font-size: 0.85rem;
+      border-top: 1px solid #d2d2d7;
+      margin-top: 20px;
+    }
+    @media (max-width: 640px) {
+      .container { padding: 20px 16px; }
+      .endpoint { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>HeecoMou API 接口文档</h1>
+      <p>语音识别纠错系统 · RESTful API · 共 17 个端点</p>
+    </header>
+
+    <div class="overview">
+      <h2>基本信息</h2>
+      <table>
+        <tr><td>Base URL</td><td><code>http://localhost:8080/api/v1</code></td></tr>
+        <tr><td>认证方式</td><td>Bearer Token (JWT)，请求头 <code>Authorization: Bearer &lt;token&gt;</code></td></tr>
+        <tr><td>响应格式</td><td><code>{ "code": 200, "message": "ok", "data": ... }</code></td></tr>
+        <tr><td>Swagger UI</td><td><a href="/swagger-ui/index.html" style="color:#0071e3">/swagger-ui/index.html</a></td></tr>
+        <tr><td>OpenAPI JSON</td><td><a href="/v3/api-docs" style="color:#0071e3">/v3/api-docs</a></td></tr>
+        <tr><td>Content-Type</td><td><code>application/json</code></td></tr>
+      </table>
+    </div>
+
+    <!-- ====== HEALTH ====== -->
+    <div class="section">
+      <h2><span class="icon">💚</span> 健康检查</h2>
+
+      <div class="endpoint">
+        <div class="ep-header">
+          <span class="badge badge-get">GET</span>
+          <span class="ep-path">/api/v1/health</span>
+          <span class="badge badge-public">公开</span>
+        </div>
+        <div class="ep-desc">健康检查端点，返回服务状态、数据库连接、Redis 连接信息。无需认证。</div>
+        <div class="resp">响应: <code>{ "status": "UP", "service": "heecomou-backend", "db": true, "redis": true }</code></div>
+      </div>
+    </div>
+
+    <!-- ====== AUTH ====== -->
+    <div class="section">
+      <h2><span class="icon">🔐</span> 认证模块 — Auth</h2>
+
+      <div class="endpoint post">
+        <div class="ep-header">
+          <span class="badge badge-post">POST</span>
+          <span class="ep-path">/api/v1/auth/register</span>
+          <span class="badge badge-public">公开</span>
+          <span style="font-size:0.8rem;color:#e65100">限流: 10次/分钟</span>
+        </div>
+        <div class="ep-desc">用户注册。使用用户名 + 密码 + 邮箱创建新账户，注册成功后可直接登录。</div>
+        <div class="props">
+          <h4>请求体</h4>
+          <pre>{
+  "username": "string (必填, 3-50字符)",
+  "password": "string (必填, 6-100字符)",
+  "email":    "string (必填, 有效邮箱)"
+}</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;UserVO&gt;</code></div>
+      </div>
+
+      <div class="endpoint post">
+        <div class="ep-header">
+          <span class="badge badge-post">POST</span>
+          <span class="ep-path">/api/v1/auth/login</span>
+          <span class="badge badge-public">公开</span>
+          <span style="font-size:0.8rem;color:#e65100">限流: 10次/分钟</span>
+        </div>
+        <div class="ep-desc">用户登录。验证用户名和密码，成功后返回 accessToken 和 refreshToken。</div>
+        <div class="props">
+          <h4>请求体</h4>
+          <pre>{
+  "username": "string (必填)",
+  "password": "string (必填)"
+}</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;LoginResponse&gt;</code> — 包含 accessToken, refreshToken, userId, username, expiresIn</div>
+      </div>
+
+      <div class="endpoint post">
+        <div class="ep-header">
+          <span class="badge badge-post">POST</span>
+          <span class="ep-path">/api/v1/auth/refresh</span>
+          <span class="badge badge-public">公开</span>
+        </div>
+        <div class="ep-desc">刷新 Token。使用 refreshToken 换取新的 accessToken + refreshToken，旧的 refreshToken 将被废弃。</div>
+        <div class="props">
+          <h4>请求体</h4>
+          <pre>{
+  "refreshToken": "string (必填)"
+}</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;LoginResponse&gt;</code></div>
+      </div>
+
+      <div class="endpoint post">
+        <div class="ep-header">
+          <span class="badge badge-post">POST</span>
+          <span class="ep-path">/api/v1/auth/logout</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">用户登出。将当前 accessToken 加入黑名单，使其立即失效。</div>
+        <div class="resp">响应: <code>ApiResponse&lt;Void&gt;</code> — "登出成功"</div>
+      </div>
+    </div>
+
+    <!-- ====== USER ====== -->
+    <div class="section">
+      <h2><span class="icon">👤</span> 用户模块 — User</h2>
+
+      <div class="endpoint">
+        <div class="ep-header">
+          <span class="badge badge-get">GET</span>
+          <span class="ep-path">/api/v1/user/me</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">获取当前登录用户的个人信息。</div>
+        <div class="resp">响应: <code>ApiResponse&lt;UserVO&gt;</code> — id, username, nickname, email, phone, avatarUrl, createdAt</div>
+      </div>
+
+      <div class="endpoint put">
+        <div class="ep-header">
+          <span class="badge badge-put">PUT</span>
+          <span class="ep-path">/api/v1/user/profile</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">更新当前用户的个人资料（昵称、邮箱、头像等）。</div>
+        <div class="props">
+          <h4>请求体</h4>
+          <pre>{
+  "nickname":  "string (可选)",
+  "email":     "string (可选, 有效邮箱)",
+  "avatarUrl": "string (可选)"
+}</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;UserVO&gt;</code></div>
+      </div>
+
+      <div class="endpoint put">
+        <div class="ep-header">
+          <span class="badge badge-put">PUT</span>
+          <span class="ep-path">/api/v1/user/password</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">修改当前用户的登录密码，需要提供原密码验证。</div>
+        <div class="props">
+          <h4>请求体</h4>
+          <pre>{
+  "oldPassword": "string (必填)",
+  "newPassword": "string (必填, 6-100字符)"
+}</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;Void&gt;</code> — "密码修改成功"</div>
+      </div>
+    </div>
+
+    <!-- ====== VOCABULARY ====== -->
+    <div class="section">
+      <h2><span class="icon">📚</span> 词库模块 — Vocabulary</h2>
+
+      <div class="endpoint">
+        <div class="ep-header">
+          <span class="badge badge-get">GET</span>
+          <span class="ep-path">/api/v1/vocabulary</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">获取当前用户的词库列表，支持分页。</div>
+        <div class="props">
+          <h4>查询参数</h4>
+          <pre>page: int (默认 1)
+size: int (默认 20)</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;VocabListResponse&gt;</code> — { items, total, page, size }</div>
+      </div>
+
+      <div class="endpoint">
+        <div class="ep-header">
+          <span class="badge badge-get">GET</span>
+          <span class="ep-path">/api/v1/vocabulary/search</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">按关键词搜索词库（匹配词汇、拼音、分类），支持分页。</div>
+        <div class="props">
+          <h4>查询参数</h4>
+          <pre>keyword: string (必填)
+page:    int    (默认 1)
+size:    int    (默认 20)</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;VocabListResponse&gt;</code></div>
+      </div>
+
+      <div class="endpoint">
+        <div class="ep-header">
+          <span class="badge badge-get">GET</span>
+          <span class="ep-path">/api/v1/vocabulary/{id}</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">按 ID 获取单个词汇详情。</div>
+        <div class="props">
+          <h4>路径参数</h4>
+          <pre>id: long (必填, 词汇ID)</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;VocabVO&gt;</code></div>
+      </div>
+
+      <div class="endpoint post">
+        <div class="ep-header">
+          <span class="badge badge-post">POST</span>
+          <span class="ep-path">/api/v1/vocabulary</span>
+          <span class="badge badge-auth">需认证</span>
+          <span style="font-size:0.8rem;color:#e65100">限流: 30次/分钟</span>
+        </div>
+        <div class="ep-desc">添加新词汇到个人词库。</div>
+        <div class="props">
+          <h4>请求体</h4>
+          <pre>{
+  "word":     "string (必填, 词汇文本)",
+  "pinyin":   "string (可选, 拼音)",
+  "category": "string (可选, 分类标签)"
+}</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;VocabVO&gt;</code> — "词汇已添加"</div>
+      </div>
+
+      <div class="endpoint put">
+        <div class="ep-header">
+          <span class="badge badge-put">PUT</span>
+          <span class="ep-path">/api/v1/vocabulary/{id}</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">更新指定词汇的信息。</div>
+        <div class="props">
+          <h4>路径参数</h4>
+          <pre>id: long (必填, 词汇ID)</pre>
+          <h4>请求体</h4>
+          <pre>{
+  "word":     "string (必填)",
+  "pinyin":   "string (可选)",
+  "category": "string (可选)"
+}</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;VocabVO&gt;</code> — "词汇已更新"</div>
+      </div>
+
+      <div class="endpoint delete">
+        <div class="ep-header">
+          <span class="badge badge-delete">DELETE</span>
+          <span class="ep-path">/api/v1/vocabulary/{id}</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">删除指定词汇。</div>
+        <div class="props">
+          <h4>路径参数</h4>
+          <pre>id: long (必填, 词汇ID)</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;Void&gt;</code> — "词汇已删除"</div>
+      </div>
+
+      <div class="endpoint post">
+        <div class="ep-header">
+          <span class="badge badge-post">POST</span>
+          <span class="ep-path">/api/v1/vocabulary/sync</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">增量同步词库数据。基于 version 字段，仅返回版本号大于指定值的词库项，用于端侧词库同步。</div>
+        <div class="props">
+          <h4>请求体</h4>
+          <pre>{
+  "version": "long (必填, 客户端当前最大版本号, 首次传 0)",
+  "limit":   "int  (必填, 单次同步上限)"
+}</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;VocabSyncResponse&gt;</code> — { items, hasMore, maxVersion }</div>
+      </div>
+    </div>
+
+    <!-- ====== CORRECTIONS ====== -->
+    <div class="section">
+      <h2><span class="icon">✏️</span> 纠错模块 — Corrections</h2>
+
+      <div class="endpoint">
+        <div class="ep-header">
+          <span class="badge badge-get">GET</span>
+          <span class="ep-path">/api/v1/corrections</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">获取当前用户的纠错历史记录列表。</div>
+        <div class="props">
+          <h4>查询参数</h4>
+          <pre>limit: int (默认 20, 返回记录数上限)</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;List&lt;CorrectionHistory&gt;&gt;</code> — [{ id, userId, originalText, correctedText, source, createdAt }]</div>
+      </div>
+
+      <div class="endpoint post">
+        <div class="ep-header">
+          <span class="badge badge-post">POST</span>
+          <span class="ep-path">/api/v1/corrections</span>
+          <span class="badge badge-auth">需认证</span>
+        </div>
+        <div class="ep-desc">提交一条纠错记录。当语音识别结果被用户手工纠正后调用。</div>
+        <div class="props">
+          <h4>请求体</h4>
+          <pre>{
+  "originalText":  "string (必填, ASR原始识别结果)",
+  "correctedText": "string (必填, 用户纠正后的文本)",
+  "source":        "string (必填, 来源标识, 如 mobile/desktop/web)"
+}</pre>
+        </div>
+        <div class="resp">响应: <code>ApiResponse&lt;CorrectionHistory&gt;</code> — "纠错已记录"</div>
+      </div>
+    </div>
+
+    <footer>
+      HeecoMou API v1.0.0 · Spring Boot + Spring Security + JWT · 
+      Swagger UI: <a href="/swagger-ui/index.html" style="color:#0071e3">/swagger-ui/index.html</a>
+    </footer>
+  </div>
+</body>
+</html>

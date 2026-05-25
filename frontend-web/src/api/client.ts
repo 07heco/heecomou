@@ -8,6 +8,13 @@ import type {
   UserVO,
   UpdateProfileRequest,
   ChangePasswordRequest,
+  VocabVO,
+  VocabRequest,
+  VocabListResponse,
+  VocabSyncRequest,
+  VocabSyncResponse,
+  CorrectionRequest,
+  CorrectionHistory,
 } from '@/types/api';
 
 const api = axios.create({
@@ -123,6 +130,41 @@ export const userApi = {
 
   changePassword: (data: ChangePasswordRequest) =>
     api.put<ApiResponse<null>>('/user/password', data),
+};
+
+export const vocabApi = {
+  list: (page = 1, size = 20) =>
+    api.get<ApiResponse<VocabListResponse>>('/vocabulary', { params: { page, size } }),
+
+  search: (keyword: string, page = 1, size = 20) =>
+    api.get<ApiResponse<VocabListResponse>>('/vocabulary/search', {
+      params: { keyword, page, size },
+    }),
+
+  getById: (id: number) =>
+    api.get<ApiResponse<VocabVO>>(`/vocabulary/${id}`),
+
+  add: (data: VocabRequest) =>
+    api.post<ApiResponse<VocabVO>>('/vocabulary', data),
+
+  update: (id: number, data: VocabRequest) =>
+    api.put<ApiResponse<VocabVO>>(`/vocabulary/${id}`, data),
+
+  delete: (id: number) =>
+    api.delete<ApiResponse<null>>(`/vocabulary/${id}`),
+
+  sync: (data: VocabSyncRequest) =>
+    api.post<ApiResponse<VocabSyncResponse>>('/vocabulary/sync', data),
+};
+
+export const correctionApi = {
+  list: (limit = 20) =>
+    api.get<ApiResponse<CorrectionHistory[]>>('/corrections', {
+      params: { limit },
+    }),
+
+  submit: (data: CorrectionRequest) =>
+    api.post<ApiResponse<CorrectionHistory>>('/corrections', data),
 };
 
 export default api;

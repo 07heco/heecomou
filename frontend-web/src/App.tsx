@@ -9,6 +9,7 @@ import DashboardPage from '@/pages/DashboardPage';
 import ProfilePage from '@/pages/ProfilePage';
 import PasswordPage from '@/pages/PasswordPage';
 import VocabularyPage from '@/pages/VocabularyPage';
+import CorrectionsPage from '@/pages/CorrectionsPage';
 
 export default function App() {
   const { initAuth, isAuthenticated, isLoading } = useAuthStore();
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/password" element={<PasswordPage />} />
           <Route path="/vocabulary" element={<VocabularyPage />} />
+          <Route path="/corrections" element={<CorrectionsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

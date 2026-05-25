@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { Mic, User, Key, BookOpen, LogOut, Menu, X, Home } from 'lucide-react';
+import { Mic, User, Key, BookOpen, LogOut, Menu, X, Home, Wrench } from 'lucide-react';
 
 export default function Layout() {
   const { user, logout } = useAuthStore();
@@ -18,6 +18,7 @@ export default function Layout() {
     { to: '/profile', label: '个人资料', icon: User },
     { to: '/password', label: '修改密码', icon: Key },
     { to: '/vocabulary', label: '词库管理', icon: BookOpen },
+    { to: '/corrections', label: '纠错历史', icon: Wrench },
   ];
 
   return (

@@ -48,3 +48,54 @@ export interface ChangePasswordRequest {
   oldPassword: string;
   newPassword: string;
 }
+
+export interface VocabVO {
+  id: number;
+  userId: number;
+  word: string;
+  pinyin: string | null;
+  category: string | null;
+  frequency: number;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VocabRequest {
+  word: string;
+  pinyin?: string;
+  category?: string;
+}
+
+export interface VocabListResponse {
+  items: VocabVO[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface VocabSyncRequest {
+  version: number;
+  limit: number;
+}
+
+export interface VocabSyncResponse {
+  items: VocabVO[];
+  hasMore: boolean;
+  maxVersion: number;
+}
+
+export interface CorrectionRequest {
+  originalText: string;
+  correctedText: string;
+  source: string;
+}
+
+export interface CorrectionHistory {
+  id: number;
+  userId: number;
+  originalText: string;
+  correctedText: string;
+  source: string;
+  createdAt: string;
+}
