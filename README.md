@@ -1,4 +1,4 @@
-﻿# HeecoMou — 智能语音输入法
+# HeecoMou — 智能语音输入法
 
 ## 目录
 
@@ -53,7 +53,10 @@
 
 ***
 
-## 3. 系统架构
+## 3. 产品需求与用户场景
+
+
+## 4. 系统架构
 
 ### 4.1 组件部署拓扑
 
@@ -380,6 +383,132 @@
 
 ***
 
+
+## 6. 多技术栈选型理由
+
+HeecoMou 采用了 **Go + Java + Kotlin + Python + TypeScript** 五种编程语言组合开发，这不是随意堆砌，而是基于各技术栈的核心优势、擅长领域，进行**优势互补、各司其职**的工程决策。
+
+### 6.1 选型全景
+
+| 技术栈 | 组件 | 擅长领域 | 在本项目承担的角色 |
+|--------|------|---------|------------------|
+| **Go** | Gateway | 高并发网络 I/O、低内存开销、单二进制部署 | WebSocket 实时音频流网关，处理数千路并发连接 |
+| **Java (Spring)** | Backend | 企业级事务管理、安全框架成熟度、ORM 生态 | 业务逻辑核心：认证鉴权、词库 CRUD、事务一致性 |
+| **Python (PyTorch)** | ASR Engine | AI/ML 生态统治力，HuggingFace 模型库 | 语音识别推理引擎，NLP 后处理 |
+| **TypeScript (React)** | Frontend Web | 组件化 UI、类型安全、开发效率 | Web 管理后台，面向运营和管理的交互界面 |
+| **Kotlin (Compose)** | Desktop Client | JVM 跨平台、声明式 UI、系统级 API 调用 | Windows 桌面客户端，快捷键体系、音频设备操控 |
+| **Kotlin (Android)** | Android IME | Android 原生支持、ONNX Runtime 移动端推理 | Android 输入法，端侧 AI 推理 |
+
+### 6.2 逐技术栈深入分析
+
+#### Go — 语音网关（高并发网关层）
+
+**选用理由：**
+
+- **天然适合 I/O 密集型高并发**：Goroutine 轻量协程（每个仅 2KB 栈空间），数千路 WebSocket 并发音频流仅需几十 MB 内存。传统 Java 线程模型（默认 1MB/线程）在同等并发量下资源消耗悬殊
+- **编译为单一静态二进制**：无运行时依赖，scp 拷贝即部署，运维极简。Python 需要安装整个解释器和依赖包
+- **标准库网络能力强大**：`net/http` 原生支持 WebSocket 升级，无需引入重量级框架
+- **显式错误处理**：音频流处理对稳定性要求极高，Go 的 `if err != nil` 模式迫使开发者关注每一处可能的失败点
+
+**解决的问题：** 低延迟、高吞吐的实时音频流转发，连接数上千时仍保持毫秒级响应。
+
+#### Java (Spring Boot) — 业务后端（企业级业务层）
+
+**选用理由：**
+
+- **Spring Security 认证体系**：开箱即用的 JWT 过滤器链、Method Security、BCrypt 密码编码器，是业界最成熟的认证鉴权框架
+- **MyBatis-Plus ORM 与事务管理**：复杂业务逻辑（词库增量同步、纠错记录关联）需要声明式事务保证数据一致性（`@Transactional`）
+- **Spring AOP 横切关注点**：`@RateLimit` 限流注解、日志切面等非业务功能零侵入织入
+- **Flyway 数据库迁移**：版本化管理 DDL，多环境部署时自动保持表结构一致
+- **Swagger/OpenAPI 自动文档生成**：Controller 注解一键生成交互式 API 文档
+
+**解决的问题：** 复杂业务规则的事务一致性、安全认证的标准实现、接口文档自动化。
+
+#### Python (FastAPI + PyTorch) — 语音识别引擎（AI 层）
+
+**选用理由：**
+
+- **AI/ML 生态绝对统治力**：PyTorch、Transformers、HuggingFace 模型库全部以 Python 为第一语言。Whisper 模型的加载、推理、微调全部基于 Python 生态
+- **HuggingFace 模型仓库**：一行代码加载 `openai/whisper-small`，无需模型格式转换
+- **NLP 工具链丰富**：`pypinyin`（汉字转拼音）、`zhconv`（简繁转换）等中文 NLP 工具仅 Python 有成熟实现
+- **FastAPI 高性能异步**：基于 Starlette + Pydantic，async/await 原生支持，性能媲美 Node.js/Go
+
+**解决的问题：** 深度学习模型推理的唯一可行技术栈。其他语言调用 Whisper 只能通过 Python 子进程或 ONNX 导出，但 ONNX 有模型兼容性损失。
+
+#### TypeScript + React — Web 管理后台（交互层）
+
+**选用理由：**
+
+- **组件化 UI 开发**：React 的函数式组件 + Hooks 模式，页面与状态逻辑清晰分离
+- **TypeScript 类型安全**：编译期发现 API 数据结构不匹配，避免运行时 `undefined is not a function`
+- **Zustand 轻量状态管理**：相比 Redux 减少 90% 样板代码，适合中型管理后台
+- **Tailwind CSS 原子化样式**：无需切换文件写 CSS，直接在 JSX 中构建界面
+
+**解决的问题：** 快速构建管理后台的交互界面，类型系统保证前后端数据结构对齐。
+
+#### Kotlin (Compose Desktop) — 桌面客户端（跨平台层）
+
+**选用理由：**
+
+- **JVM 生态复用**：可与 Java Backend 共享 DTO 定义，减少跨服务数据模型重复定义
+- **JetBrains Compose 声明式 UI**：与 Android Jetpack Compose 同源，桌面端和移动端 UI 代码思维模型一致
+- **jnativehook 全局键盘钩子**：JVM 可以通过 JNI 调用系统级 API，实现 Ctrl+Shift+V 全局快捷键
+- **SQLite 嵌入式数据库**：本地词库缓存无需额外安装数据库，sqlite-jdbc 一行依赖即可
+
+**解决的问题：** 桌面端原生体验（全局热键、系统托盘、音频设备操控），同时保持与 Android 端 UI 框架的一致性。
+
+#### Kotlin (Android) — 移动端输入法（端侧推理层）
+
+**选用理由：**
+
+- **Android InputMethodService**：Kotlin 是 Android 官方推荐语言，IME 框架 API 原生支持
+- **ONNX Runtime Android 官方包**：`com.microsoft.onnxruntime:onnxruntime-android` 专为 ARM 移动芯片优化，支持 NPU 加速
+- **Retrofit + OkHttp 网络栈**：Android 端普遍使用，社区成熟
+- **Kotlin Coroutines**：用同步语法写异步代码，避免回调地狱
+
+**解决的问题：** Android 端侧离线语音识别 + 系统级输入法集成。
+
+### 6.3 技术栈协同优势
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                        技术栈协同矩阵                                   │
+├──────────────┬──────────┬──────────┬──────────┬──────────┬───────────┤
+│              │ Go       │ Java     │ Python   │ Kotlin   │ TypeScript│
+├──────────────┼──────────┼──────────┼──────────┼──────────┼───────────┤
+│ 高并发I/O    │  ★★★★★   │  ★★★    │  ★★     │  ★★     │  ★★       │
+│ 事务/安全    │  ★★     │  ★★★★★   │  ★      │  ★★     │  ★★       │
+│ AI/ML 推理   │  ★      │  ★      │  ★★★★★   │  ★★★    │  ★        │
+│ 跨平台 UI    │  ★      │  ★★     │  ★      │  ★★★★★   │  ★★★★★    │
+│ 类型安全     │  ★★★    │  ★★★★   │  ★★     │  ★★★★   │  ★★★★     │
+│ 部署简便     │  ★★★★★   │  ★★★    │  ★★     │  ★★★    │  ★★★      │
+├──────────────┼──────────┼──────────┼──────────┼──────────┼───────────┤
+│ 承担角色     │ 实时网关  │ 业务核心  │ AI 推理  │ 客户端   │ Web 管理  │
+└──────────────┴──────────┴──────────┴──────────┴──────────┴───────────┘
+```
+
+**核心协同关系：**
+
+1. **Go ↔ Python**：Go 网关负责高并发音频接收，Python 专注模型推理。Go 通过轮询负载均衡将音频分发到多实例 Python ASR，实现计算密集型（AI 推理）与 I/O 密集型（网络连接）的解耦
+2. **Java ↔ 所有客户端**：Java Backend 是唯一的数据真相源（Single Source of Truth），所有客户端（Desktop/Android/Web）通过 REST API 与 Java 后端交互，数据模型由 Java 端 DTO 定义
+3. **Kotlin Desktop ↔ Kotlin Android**：共享 ASR 路由逻辑和词库同步协议，两端代码可以相互参考实现
+4. **Python ASR ↔ Java Backend**：ASR 推理完成后，Python 通过 `VocabInjector` 调用 Java Backend 的词库 API 获取热词，实现推理结果的质量增强
+
+### 6.4 如果单一技术栈会怎样
+
+| 如果全用... | 最大的损失 |
+|------------|----------|
+| 全 Go | 缺少成熟的企业级认证/事务框架，AI 推理生态基本空白 |
+| 全 Java | ASR 推理只能用 ONNX 导出的次优模型，Python NLP 工具链完全不可用 |
+| 全 Python | 高并发 WebSocket 网关性能不足（GIL 限制），桌面端全局热键无法实现 |
+| 全 Kotlin | AI/ML 生态薄弱，中文 NLP 工具链缺失，高并发网关内存开销大 |
+| 全 TypeScript (Node.js) | ASR 推理生态不成熟，桌面端系统级 API 调用困难 |
+
+**结论：多技术栈组合不是过度工程化，而是每层选择该领域最优解后自然形成的结果。** 组件之间通过标准的 HTTP/WebSocket/gRPC 协议解耦，技术栈差异不会形成沟通障碍。
+
+
+---
+
 ## 7. 数据库设计
 
 ### 7.1 user 表
@@ -417,7 +546,7 @@ CREATE TABLE vocabulary (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-### 5.3 correction\_history 表
+### 7.3 correction\_history 表
 
 ```sql
 CREATE TABLE correction_history (
@@ -708,3 +837,14 @@ cd client-android && ./gradlew test
 
 > 本文档由 HeecoMou 开发团队维护，随项目迭代持续更新。
 
+
+***
+
+
+***
+
+## 13. Demo 视频
+
+HeecoMou 功能演示视频：[《HeecoMou Demo 视频》](https://www.yuque.com/u49119058/azmmfs/xyftrcv2gueqwf8o?singleDoc#)
+
+> 点击上方链接查看 HeecoMou 产品的完整功能演示，包含语音输入、词库管理、纠错反馈等核心流程。
