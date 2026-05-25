@@ -37,9 +37,10 @@ func TestAudioHandlerIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to listen: %v", err)
 	}
-	defer listener.Close()
 
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
@@ -89,6 +90,7 @@ func TestAudioHandlerIntegration(t *testing.T) {
 				sessionID := genUUID()
 				sessionDir := filepath.Join(dir, sessionID)
 				os.MkdirAll(sessionDir, 0755)
+				defer os.RemoveAll(sessionDir)
 
 				msg, _ := json.Marshal(map[string]interface{}{
 					"type":       "session_started",
@@ -180,6 +182,8 @@ func TestAudioHandlerIntegration(t *testing.T) {
 	}
 
 	conn.Close()
+	listener.Close()
+	<-done
 
 	entries, _ := os.ReadDir(dir)
 	found := false
