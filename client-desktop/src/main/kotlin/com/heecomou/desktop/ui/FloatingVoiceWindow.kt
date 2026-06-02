@@ -1,6 +1,9 @@
 package com.heecomou.desktop.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -16,8 +19,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.FrameWindowScope
-import kotlin.math.abs
 import kotlin.math.sin
+
+private val BrandBlue = Color(0xFF2563EB)
+private val AccentGreen = Color(0xFF10B981)
+private val AccentOrange = Color(0xFFF59E0B)
+private val AlertRed = Color(0xFFEF4444)
 
 enum class VoiceInputState {
     IDLE,
@@ -47,8 +54,8 @@ fun FrameWindowScope.FloatingVoiceWindow(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xCC1A1A2E), RoundedCornerShape(16.dp))
-            .padding(20.dp)
+            .background(Color(0xF01A1A2E), RoundedCornerShape(18.dp))
+            .padding(24.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -71,34 +78,49 @@ fun FrameWindowScope.FloatingVoiceWindow(
 
 @Composable
 private fun IdleContent() {
-    Spacer(modifier = Modifier.height(20.dp))
+    Spacer(modifier = Modifier.height(24.dp))
 
     Box(
         modifier = Modifier
-            .size(64.dp)
+            .size(72.dp)
             .clip(CircleShape)
-            .background(Color(0xFF4A90D9)),
+            .background(BrandBlue.copy(alpha = 0.2f)),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = "\uD83C\uDF99",
-            fontSize = 28.sp
-        )
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(BrandBlue),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = "\uD83C\uDF99\uFE0F", fontSize = 24.sp)
+        }
     }
 
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier = Modifier.height(12.dp))
 
     Text(
         text = "准备就绪",
-        color = Color.White.copy(alpha = 0.8f),
-        fontSize = 14.sp,
+        color = Color.White,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.SemiBold,
         textAlign = TextAlign.Center
     )
 
     Text(
         text = "开始说话以输入文字",
-        color = Color.White.copy(alpha = 0.5f),
+        color = Color.White.copy(alpha = 0.45f),
         fontSize = 12.sp,
+        textAlign = TextAlign.Center
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Text(
+        text = "按 Ctrl+Shift+V 开始语音输入",
+        color = Color.White.copy(alpha = 0.3f),
+        fontSize = 11.sp,
         textAlign = TextAlign.Center
     )
 }
@@ -113,20 +135,20 @@ private fun ListeningContent(
 
     Box(
         modifier = Modifier
-            .size((48 + animatedLevel * 32).dp)
+            .size((52 + animatedLevel * 28).dp)
             .clip(CircleShape)
             .background(
-                Color(0xFFE74C3C).copy(alpha = 0.7f + animatedLevel * 0.3f)
+                AlertRed.copy(alpha = 0.6f + animatedLevel * 0.35f)
             ),
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "\uD83C\uDF99",
-            fontSize = (22 + animatedLevel * 8).sp
+            text = "\uD83C\uDF99\uFE0F",
+            fontSize = (22 + animatedLevel * 6).sp
         )
     }
 
-    Spacer(modifier = Modifier.height(4.dp))
+    Spacer(modifier = Modifier.height(8.dp))
 
     val minutes = recordingSeconds / 60
     val seconds = recordingSeconds % 60
@@ -134,8 +156,8 @@ private fun ListeningContent(
     val remaining = maxSeconds - recordingSeconds.toInt()
 
     Text(
-        text = "正在聆听...  $timeText",
-        color = Color.White.copy(alpha = 0.9f),
+        text = "\u25CF 正在聆听  $timeText",
+        color = Color.White,
         fontSize = 14.sp,
         fontWeight = FontWeight.Medium,
         textAlign = TextAlign.Center
@@ -143,9 +165,10 @@ private fun ListeningContent(
 
     if (remaining <= 10) {
         Text(
-            text = "即将自动停止: ${remaining}秒",
+            text = "\u26A0\uFE0F 将在 ${remaining} 秒后自动停止",
             color = Color(0xFFFF6B6B),
             fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center
         )
     }
@@ -153,8 +176,8 @@ private fun ListeningContent(
     AudioLevelBars(animatedLevel)
 
     Text(
-        text = "再按 Ctrl+Shift+V 停止识别 | 最长${maxSeconds}秒",
-        color = Color.White.copy(alpha = 0.5f),
+        text = "再按 Ctrl+Shift+V 停止识别  |  最长 ${maxSeconds} 秒",
+        color = Color.White.copy(alpha = 0.45f),
         fontSize = 11.sp,
         textAlign = TextAlign.Center
     )
@@ -162,28 +185,39 @@ private fun ListeningContent(
 
 @Composable
 private fun RecognizingContent(partialText: String) {
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier = Modifier.height(12.dp))
 
     Box(
         modifier = Modifier
-            .size(56.dp)
+            .size(60.dp)
             .clip(CircleShape)
-            .background(Color(0xFF4A90D9)),
+            .background(BrandBlue.copy(alpha = 0.15f)),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = "\u23F3",
-            fontSize = 24.sp
+        CircularProgressIndicator(
+            modifier = Modifier.size(36.dp),
+            color = BrandBlue,
+            strokeWidth = 3.dp,
+            trackColor = BrandBlue.copy(alpha = 0.15f)
         )
     }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Text(
+        text = "识别中...",
+        color = BrandBlue,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center
+    )
 
     Spacer(modifier = Modifier.height(4.dp))
 
     Text(
-        text = "识别中...",
-        color = Color(0xFF4A90D9),
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Medium,
+        text = "正在将语音转换为文字",
+        color = Color.White.copy(alpha = 0.45f),
+        fontSize = 12.sp,
         textAlign = TextAlign.Center
     )
 
@@ -192,14 +226,15 @@ private fun RecognizingContent(partialText: String) {
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = Color.White.copy(alpha = 0.1f),
-            shape = RoundedCornerShape(8.dp)
+            color = Color.White.copy(alpha = 0.08f),
+            shape = RoundedCornerShape(10.dp)
         ) {
             Text(
                 text = partialText,
-                color = Color.White.copy(alpha = 0.7f),
+                color = Color.White.copy(alpha = 0.65f),
                 fontSize = 13.sp,
-                modifier = Modifier.padding(12.dp)
+                modifier = Modifier.padding(12.dp),
+                lineHeight = 18.sp
             )
         }
     }
@@ -217,16 +252,21 @@ private fun ResultContent(
 
     Spacer(modifier = Modifier.height(4.dp))
 
-    Text(
-        text = "\u2705",
-        fontSize = 28.sp
-    )
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(AccentGreen.copy(alpha = 0.15f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = "\u2714\uFE0F", fontSize = 22.sp)
+    }
 
     Text(
         text = "识别完成",
-        color = Color(0xFF2ECC71),
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Medium
+        color = AccentGreen,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.SemiBold
     )
 
     if (originalText.isNotEmpty()) {
@@ -242,21 +282,31 @@ private fun ResultContent(
                 lineHeight = 20.sp
             ),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF4A90D9),
-                unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                cursorColor = Color(0xFF4A90D9)
+                focusedBorderColor = BrandBlue,
+                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                cursorColor = BrandBlue
             ),
             maxLines = 3,
             singleLine = false
         )
 
-        if (hasChanges) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "\u270F\uFE0F 文本已修改，可提交纠错",
-                color = Color(0xFFF39C12),
-                fontSize = 11.sp
-            )
+        AnimatedVisibility(
+            visible = hasChanges,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = AccentOrange.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = "\u270F\uFE0F 文本已修改，可提交纠错",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = AccentOrange,
+                    fontSize = 11.sp
+                )
+            }
         }
     }
 
@@ -264,7 +314,7 @@ private fun ResultContent(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)
     ) {
         if (hasChanges) {
             Button(
@@ -272,32 +322,32 @@ private fun ResultContent(
                     onSubmitCorrection(originalText, editedText)
                     submitted = true
                 },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE67E22)
-                ),
-                shape = RoundedCornerShape(8.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Text("提交纠错", fontSize = 13.sp)
+                Text("提交纠错", fontSize = 13.sp, fontWeight = FontWeight.Medium)
             }
         }
 
         Button(
             onClick = onDismiss,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF4A90D9)
-            ),
-            shape = RoundedCornerShape(8.dp)
+            colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
+            shape = RoundedCornerShape(10.dp)
         ) {
-            Text("关闭", fontSize = 13.sp)
+            Text("关闭", fontSize = 13.sp, fontWeight = FontWeight.Medium)
         }
     }
 
-    if (submitted) {
-        Spacer(modifier = Modifier.height(4.dp))
+    AnimatedVisibility(
+        visible = submitted,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
         Text(
             text = "\u2714\uFE0F 纠错已提交",
-            color = Color(0xFF2ECC71),
-            fontSize = 12.sp
+            color = AccentGreen,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
         )
     }
 }
@@ -305,13 +355,13 @@ private fun ResultContent(
 @Composable
 private fun AudioLevelBars(level: Float) {
     val barCount = 5
-    val baseHeight = 8.dp
-    val maxHeight = 32.dp
+    val baseHeight = 10.dp
+    val maxHeight = 36.dp
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -322,11 +372,11 @@ private fun AudioLevelBars(level: Float) {
 
             Box(
                 modifier = Modifier
-                    .width(4.dp)
+                    .width(5.dp)
                     .height(height)
-                    .clip(RoundedCornerShape(2.dp))
+                    .clip(RoundedCornerShape(3.dp))
                     .background(
-                        Color(0xFF4A90D9).copy(alpha = 0.4f + barLevel * 0.6f)
+                        BrandBlue.copy(alpha = 0.35f + barLevel * 0.65f)
                     )
             )
         }

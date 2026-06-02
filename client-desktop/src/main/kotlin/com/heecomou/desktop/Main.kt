@@ -1,15 +1,22 @@
 package com.heecomou.desktop
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.*
 import com.heecomou.desktop.audio.AudioCaptureManager
 import com.heecomou.desktop.asr.*
@@ -402,89 +409,194 @@ fun main() = application {
     }
 
     if (isMainWindowVisible) {
+        val mainBg = Color(0xFFF5F7FA)
+        val primaryBlue = Color(0xFF2563EB)
+
         Window(
             onCloseRequest = { isMainWindowVisible = false },
             title = "HeecoMou Desktop",
-            state = rememberWindowState(width = 520.dp, height = 500.dp)
+            state = rememberWindowState(width = 560.dp, height = 620.dp)
         ) {
             MaterialTheme {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "HeecoMou Desktop",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(statusMessage)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "按 Ctrl+Shift+V 开始/停止语音输入 | Esc 取消",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    StatusRow("热键", if (hotkeyManager.isRegistered()) "\u2705 已注册" else "\u274C 未注册")
-                    StatusRow("音频", if (audioCaptureManager.isSupported()) "\u2705 可用" else "\u26A0\uFE0F 不可用")
-                    StatusRow("词库", "${vocabCount} 词")
-                    StatusRow("账号", if (isLoggedIn) "\u2705 ${loggedInUsername}" else "\u26A0\uFE0F 未登录")
-                    StatusRow("模式", asrPreferences.engineMode.label)
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = { startAsrPipeline() },
-                            modifier = Modifier.weight(1f)
+                Box(modifier = Modifier.fillMaxSize().background(mainBg)) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(primaryBlue)
+                                .padding(start = 24.dp, end = 24.dp, top = 32.dp, bottom = 24.dp)
                         ) {
-                            Text("语音输入")
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (isLoggedIn) loggedInUsername.take(1).uppercase() else "\uD83C\uDF99",
+                                        fontSize = if (isLoggedIn) 22.sp else 24.sp,
+                                        color = Color.White
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "HeecoMou",
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = if (isLoggedIn) "欢迎, $loggedInUsername" else "智能语音输入法",
+                                    fontSize = 13.sp,
+                                    color = Color.White.copy(alpha = 0.8f)
+                                )
+                            }
                         }
 
-                        OutlinedButton(
-                            onClick = {
-                                asrPreferences = when (asrPreferences.engineMode) {
-                                    AsrEngineMode.AUTO -> AsrPreferences(engineMode = AsrEngineMode.CLOUD)
-                                    AsrEngineMode.CLOUD -> AsrPreferences(engineMode = AsrEngineMode.LOCAL)
-                                    AsrEngineMode.LOCAL -> AsrPreferences(engineMode = AsrEngineMode.AUTO)
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text(asrPreferences.engineMode.label)
-                        }
-                    }
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = statusColor(statusMessage),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text(
+                                    text = statusMessage,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                    fontSize = 13.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "按 Ctrl+Shift+V 开始/停止语音输入  |  Esc 取消",
+                                fontSize = 12.sp,
+                                color = Color(0xFF6B7280),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        TextButton(
-                            onClick = {
-                                if (isLoggedIn) {
-                                    tokenManager.clear()
-                                    isLoggedIn = false
-                                    loggedInUsername = ""
-                                    vocabCount = 0
-                                    statusMessage = "已登出"
-                                } else {
-                                    showLoginWindow = true
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                MiniStatusCard(
+                                    modifier = Modifier.weight(1f),
+                                    icon = "\u2328\uFE0F",
+                                    label = "热键",
+                                    value = if (hotkeyManager.isRegistered()) "已注册" else "未注册",
+                                    ok = hotkeyManager.isRegistered()
+                                )
+                                MiniStatusCard(
+                                    modifier = Modifier.weight(1f),
+                                    icon = "\uD83C\uDF99\uFE0F",
+                                    label = "音频",
+                                    value = if (audioCaptureManager.isSupported()) "可用" else "不可用",
+                                    ok = audioCaptureManager.isSupported()
+                                )
+                                MiniStatusCard(
+                                    modifier = Modifier.weight(1f),
+                                    icon = "\uD83D\uDCDA",
+                                    label = "词库",
+                                    value = "${vocabCount} 词",
+                                    ok = true
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                MiniStatusCard(
+                                    modifier = Modifier.weight(1f),
+                                    icon = "\uD83D\uDC64",
+                                    label = "账号",
+                                    value = if (isLoggedIn) loggedInUsername else "未登录",
+                                    ok = isLoggedIn
+                                )
+                                MiniStatusCard(
+                                    modifier = Modifier.weight(1f),
+                                    icon = "\u2699\uFE0F",
+                                    label = "模式",
+                                    value = asrPreferences.engineMode.label,
+                                    ok = true
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Button(
+                                onClick = { startAsrPipeline() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = primaryBlue),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = "\uD83C\uDF99\uFE0F  开始语音输入",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        asrPreferences = when (asrPreferences.engineMode) {
+                                            AsrEngineMode.AUTO -> AsrPreferences(engineMode = AsrEngineMode.CLOUD)
+                                            AsrEngineMode.CLOUD -> AsrPreferences(engineMode = AsrEngineMode.LOCAL)
+                                            AsrEngineMode.LOCAL -> AsrPreferences(engineMode = AsrEngineMode.AUTO)
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).height(44.dp),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text(
+                                        text = "切换: ${asrPreferences.engineMode.label}",
+                                        fontSize = 13.sp
+                                    )
                                 }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(if (isLoggedIn) "登出" else "登录")
+
+                                OutlinedButton(
+                                    onClick = {
+                                        if (isLoggedIn) {
+                                            tokenManager.clear()
+                                            isLoggedIn = false
+                                            loggedInUsername = ""
+                                            vocabCount = 0
+                                            statusMessage = "已登出"
+                                        } else {
+                                            showLoginWindow = true
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).height(44.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = if (isLoggedIn) {
+                                        ButtonDefaults.outlinedButtonColors(
+                                            contentColor = Color(0xFFEF4444)
+                                        )
+                                    } else {
+                                        ButtonDefaults.outlinedButtonColors()
+                                    }
+                                ) {
+                                    Text(
+                                        text = if (isLoggedIn) "登出" else "登录",
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -517,20 +629,48 @@ fun main() = application {
 }
 
 @Composable
-private fun StatusRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+private fun MiniStatusCard(
+    modifier: Modifier = Modifier,
+    icon: String,
+    label: String,
+    value: String,
+    ok: Boolean
+) {
+    Surface(
+        modifier = modifier,
+        color = Color.White,
+        shape = RoundedCornerShape(10.dp),
+        shadowElevation = 1.dp
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium
-        )
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = icon, fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                color = Color(0xFF6B7280)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = value,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (ok) Color(0xFF2563EB) else Color(0xFFEF4444)
+            )
+        }
+    }
+}
+
+private fun statusColor(msg: String): Color {
+    return when {
+        msg.contains("已登录") || msg.contains("完成") || msg.contains("最新") -> Color(0xFF16A34A)
+        msg.contains("已登出") || msg.contains("未登录") || msg.contains("离线") || msg.contains("不可用") -> Color(0xFF6B7280)
+        msg.contains("失败") || msg.contains("错误") || msg.contains("\u26A0") -> Color(0xFFEF4444)
+        msg.contains("识别中") || msg.contains("同步") || msg.contains("连接") -> Color(0xFF2563EB)
+        else -> Color(0xFF2563EB)
     }
 }
 
