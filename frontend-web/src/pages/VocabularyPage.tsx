@@ -32,6 +32,7 @@ export default function VocabularyPage() {
   const [message, setMessage] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [allTotal, setAllTotal] = useState(0);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -66,6 +67,21 @@ export default function VocabularyPage() {
   useEffect(() => {
     fetchList(page, keyword, selectedCategory);
   }, [page, keyword, selectedCategory, fetchList]);
+
+  const fetchAllTotal = useCallback(async () => {
+    try {
+      const res = await vocabApi.list(1, 1);
+      if (res.data.code === 200) setAllTotal(res.data.data.total);
+    } catch { /* 静默失败，按钮最多显示 0 */ }
+  }, []);
+
+  useEffect(() => { fetchAllTotal(); }, [fetchAllTotal]);
+
+  const refreshAfterMutation = () => {
+    fetchCategories();
+    fetchAllTotal();
+    fetchList(page, keyword, selectedCategory);
+  };
 
   const groupedItems = useMemo((): CategoryGroup[] => {
     if (selectedCategory !== '') {
@@ -128,8 +144,7 @@ export default function VocabularyPage() {
         setMessage('添加成功');
       }
       setShowForm(false);
-      fetchCategories();
-      fetchList(page, keyword, selectedCategory);
+      refreshAfterMutation();
     } catch {
       setMessage('操作失败');
     }
@@ -140,13 +155,12 @@ export default function VocabularyPage() {
     try {
       await vocabApi.delete(id);
       setMessage('删除成功');
-      fetchCategories();
       const newTotal = total - 1;
       const newTotalPages = Math.max(1, Math.ceil(newTotal / PAGE_SIZE));
       if (page > newTotalPages) {
         setPage(newTotalPages);
       } else {
-        fetchList(page, keyword, selectedCategory);
+        refreshAfterMutation();
       }
     } catch {
       setMessage('删除失败');
@@ -158,8 +172,7 @@ export default function VocabularyPage() {
       const res = await vocabApi.sync({ version: 0, limit: 500 });
       if (res.data.code === 200) {
         setMessage(`同步完成 (${res.data.data.items.length} 项)`);
-        fetchCategories();
-        fetchList(page, keyword, selectedCategory);
+        refreshAfterMutation();
       }
     } catch {
       setMessage('同步失败');
@@ -287,7 +300,7 @@ export default function VocabularyPage() {
             selectedCategory === ''
               ? 'bg-primary-600 text-white shadow-sm'
               : 'bg-surface-muted text-gray-600 hover:bg-surface-muted/80'}`}>
-          全部 ({total})
+          全部 ({allTotal})
         </button>
         {categories.map((cat) => (
           <button key={cat} onClick={() => handleCategoryChange(cat)}
