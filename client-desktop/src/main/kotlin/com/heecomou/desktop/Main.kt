@@ -67,6 +67,7 @@ fun main() = application {
     var isLoggedIn by remember { mutableStateOf(false) }
     var loggedInUsername by remember { mutableStateOf("") }
     var showLoginWindow by remember { mutableStateOf(false) }
+    var fallbackInProgress by remember { mutableStateOf(false) }
 
     fun bumpUsedWords(text: String) {
         if (text.isBlank()) return
@@ -105,7 +106,10 @@ fun main() = application {
         }
     }
 
-    fun startCloudRecognition() {
+    var startLocalRecognition: () -> Unit = {}
+    var startCloudRecognition: () -> Unit = {}
+
+    startCloudRecognition = {
         println("[DEBUG] startCloudRecognition: connecting to cloud ASR...")
 
         audioCaptureManager.onAudioData = { pcmData ->
@@ -138,12 +142,22 @@ fun main() = application {
             }
         }
         cloudAsrClient.onConnectionFailed = { err ->
-            statusMessage = "连接失败: $err"
-            voiceInputState = VoiceInputState.IDLE
-            isVoiceWindowVisible = false
-            timerJob?.cancel()
-            audioCaptureManager.stopRecording()
-            println("[DEBUG] connection failed: $err")
+            println("[DEBUG] cloud connection failed: $err")
+            if (!fallbackInProgress) {
+                fallbackInProgress = true
+                statusMessage = "云端不可达，自动切换到端侧识别..."
+                println("[DEBUG] falling back to local ASR")
+                audioCaptureManager.stopRecording()
+                cloudAsrClient.disconnect()
+                startLocalRecognition()
+            } else {
+                statusMessage = "云端和端侧均不可用，请检查网络或运行环境"
+                voiceInputState = VoiceInputState.IDLE
+                isVoiceWindowVisible = false
+                audioCaptureManager.stopRecording()
+                fallbackInProgress = false
+                println("[DEBUG] both cloud and local failed: $err")
+            }
         }
         cloudAsrClient.onError = { err ->
             statusMessage = "识别错误: $err"
@@ -173,22 +187,31 @@ fun main() = application {
             statusMessage = "麦克风启动失败"
             voiceInputState = VoiceInputState.IDLE
             isVoiceWindowVisible = false
-            return
+        } else {
+            startRecordingTimer()
         }
-
-        startRecordingTimer()
     }
 
-    fun startLocalRecognition() {
+    startLocalRecognition = {
         println("[DEBUG] startLocalRecognition: initializing local ASR...")
 
         if (!localAsrClient.initialize()) {
-            println("[DEBUG] local ASR init failed, falling back to cloud")
-            statusMessage = "端侧初始化失败，切换到云端"
-            voiceInputState = VoiceInputState.IDLE
-            startCloudRecognition()
-            return
-        }
+            println("[DEBUG] local ASR init failed")
+            if (!fallbackInProgress) {
+                fallbackInProgress = true
+                statusMessage = "端侧初始化失败，尝试云端识别..."
+                println("[DEBUG] falling back to cloud")
+                startCloudRecognition()
+            } else {
+                statusMessage = "端侧和云端均不可用，请检查 Python 环境和网络"
+                voiceInputState = VoiceInputState.IDLE
+                isVoiceWindowVisible = false
+                fallbackInProgress = false
+                println("[DEBUG] both local and cloud failed")
+            }
+        } else {
+
+        fallbackInProgress = false
 
         localAsrClient.vocabWords = localVocabStore.search("", 500).map { it.first }
 
@@ -240,10 +263,10 @@ fun main() = application {
             statusMessage = "麦克风启动失败"
             voiceInputState = VoiceInputState.IDLE
             isVoiceWindowVisible = false
-            return
+        } else {
+            startRecordingTimer()
         }
-
-        startRecordingTimer()
+    }
     }
 
     fun startAsrPipeline() {
@@ -257,14 +280,26 @@ fun main() = application {
             VoiceInputState.IDLE -> { /* proceed */ }
         }
 
+        fallbackInProgress = false
+
         try {
+            // Quick reachability check for cloud server
+            val cloudReachable = try {
+                val socket = java.net.Socket()
+                socket.connect(java.net.InetSocketAddress("117.72.201.26", 8080), 2000)
+                socket.close()
+                true
+            } catch (_: Exception) {
+                false
+            }
+
             val decision = asrRouter.decide(
                 preferences = asrPreferences,
-                isNetworkAvailable = true,
+                isNetworkAvailable = cloudReachable,
                 networkRttMs = 0,
                 noiseLevel = 0
             )
-            println("[DEBUG] AsrRouter: ${decision.mode.label} — ${decision.reason}")
+            println("[DEBUG] AsrRouter: ${decision.mode.label} — ${decision.reason} (cloudReachable=$cloudReachable)")
 
             isVoiceWindowVisible = true
             voiceInputState = VoiceInputState.LISTENING
@@ -274,7 +309,14 @@ fun main() = application {
             when (decision.mode) {
                 AsrEngineMode.CLOUD -> startCloudRecognition()
                 AsrEngineMode.LOCAL -> startLocalRecognition()
-                AsrEngineMode.AUTO -> startCloudRecognition()
+                AsrEngineMode.AUTO -> {
+                    if (cloudReachable) {
+                        startCloudRecognition()
+                    } else {
+                        statusMessage = "网络不可达，使用端侧识别"
+                        startLocalRecognition()
+                    }
+                }
             }
         } catch (e: Exception) {
             println("[DEBUG] startAsrPipeline exception: ${e.message}")
@@ -288,6 +330,7 @@ fun main() = application {
 
     fun stopAsrPipeline() {
         timerJob?.cancel()
+        fallbackInProgress = false
         audioCaptureManager.stopRecording()
         cloudAsrClient.disconnect()
         localAsrClient.stopListening()
