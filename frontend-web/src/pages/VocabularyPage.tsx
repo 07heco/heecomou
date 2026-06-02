@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Search, Plus, Edit2, Trash2, RefreshCw, X,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
@@ -10,6 +10,11 @@ interface VocabFormData {
   word: string;
   pinyin: string;
   category: string;
+}
+
+interface CategoryGroup {
+  name: string;
+  items: VocabVO[];
 }
 
 const initialForm: VocabFormData = { word: '', pinyin: '', category: '' };
@@ -30,11 +35,7 @@ export default function VocabularyPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const fetchList = useCallback(async (
-    p: number,
-    kw: string,
-    cat: string,
-  ) => {
+  const fetchList = useCallback(async (p: number, kw: string, cat: string) => {
     setLoading(true);
     try {
       const c = cat || undefined;
@@ -55,21 +56,33 @@ export default function VocabularyPage() {
   const fetchCategories = useCallback(async () => {
     try {
       const res = await vocabApi.categories();
-      if (res.data.code === 200) {
-        setCategories(res.data.data);
-      }
+      if (res.data.code === 200) setCategories(res.data.data);
     } catch {
       setCategories([]);
     }
   }, []);
 
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
-
+  useEffect(() => { fetchCategories(); }, [fetchCategories]);
   useEffect(() => {
     fetchList(page, keyword, selectedCategory);
   }, [page, keyword, selectedCategory, fetchList]);
+
+  const groupedItems = useMemo((): CategoryGroup[] => {
+    if (selectedCategory !== '') {
+      return items.length > 0 ? [{ name: selectedCategory, items }] : [];
+    }
+    const groups: CategoryGroup[] = [];
+    let currentGroup: CategoryGroup | null = null;
+    for (const item of items) {
+      const cat = item.category || '未分类';
+      if (!currentGroup || currentGroup.name !== cat) {
+        currentGroup = { name: cat, items: [] };
+        groups.push(currentGroup);
+      }
+      currentGroup.items.push(item);
+    }
+    return groups;
+  }, [items, selectedCategory]);
 
   const handleSearch = () => {
     setPage(1);
@@ -100,10 +113,7 @@ export default function VocabularyPage() {
   };
 
   const handleSubmit = async () => {
-    if (!form.word.trim()) {
-      setMessage('请输入词汇');
-      return;
-    }
+    if (!form.word.trim()) { setMessage('请输入词汇'); return; }
     const data: VocabRequest = {
       word: form.word.trim(),
       pinyin: form.pinyin.trim() || undefined,
@@ -160,6 +170,87 @@ export default function VocabularyPage() {
     if (p >= 1 && p <= totalPages) setPage(p);
   };
 
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const nums: (number | 'ellipsis')[] = [1];
+    if (page > 3) nums.push('ellipsis');
+    for (let p = Math.max(2, page - 1); p <= Math.min(totalPages - 1, page + 1); p++) {
+      nums.push(p);
+    }
+    if (page < totalPages - 2) nums.push('ellipsis');
+    nums.push(totalPages);
+    return nums;
+  }, [page, totalPages]);
+
+  const renderPagination = () => (
+    <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
+      <span className="text-sm text-gray-500">
+        每页 {PAGE_SIZE} 条 · 共 {total} 条 · 第 {page}/{totalPages} 页
+      </span>
+      <div className="flex items-center gap-1">
+        <button onClick={() => goToPage(1)} disabled={page <= 1} title="首页"
+          className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30">
+          <ChevronsLeft className="h-4 w-4" />
+        </button>
+        <button onClick={() => goToPage(page - 1)} disabled={page <= 1} title="上一页"
+          className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30">
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        {pageNumbers.map((p, idx) =>
+          p === 'ellipsis' ? (
+            <span key={`e${idx}`} className="px-1 text-sm text-gray-400">…</span>
+          ) : (
+            <button key={p} onClick={() => goToPage(p)}
+              className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${
+                p === page ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-surface-muted'
+              }`}>
+              {p}
+            </button>
+          )
+        )}
+        <button onClick={() => goToPage(page + 1)} disabled={page >= totalPages} title="下一页"
+          className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30">
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        <button onClick={() => goToPage(totalPages)} disabled={page >= totalPages} title="尾页"
+          className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30">
+          <ChevronsRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderItemRow = (item: VocabVO) => (
+    <tr key={item.id} className="hover:bg-surface-muted transition-colors">
+      <td className="px-4 py-3">
+        <span className="font-semibold text-deep-800">{item.word}</span>
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-500">{item.pinyin || '-'}</td>
+      <td className="px-4 py-3">
+        {item.category ? (
+          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-gray-600">
+            {item.category}
+          </span>
+        ) : (
+          <span className="text-sm text-gray-400">未分类</span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-500">{item.frequency}</td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex justify-end gap-1">
+          <button onClick={() => openEdit(item)}
+            className="rounded p-1.5 text-gray-400 hover:bg-surface-muted hover:text-primary-600">
+            <Edit2 className="h-4 w-4" />
+          </button>
+          <button onClick={() => handleDelete(item.id)}
+            className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+
   return (
     <div className="animate-fade-in">
       <div className="mb-6 flex items-center justify-between">
@@ -182,39 +273,28 @@ export default function VocabularyPage() {
       )}
 
       <div className="mb-4 flex gap-2">
-        <input
-          className="input flex-1"
-          placeholder="搜索词汇..."
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-        />
+        <input className="input flex-1" placeholder="搜索词汇..."
+          value={keyword} onChange={(e) => setKeyword(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
         <button onClick={handleSearch} className="btn-secondary flex items-center gap-1.5">
           <Search className="h-4 w-4" /> 搜索
         </button>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
-        <button
-          onClick={() => handleCategoryChange('')}
+        <button onClick={() => handleCategoryChange('')}
           className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
             selectedCategory === ''
               ? 'bg-primary-600 text-white shadow-sm'
-              : 'bg-surface-muted text-gray-600 hover:bg-surface-muted/80'
-          }`}
-        >
-          全部
+              : 'bg-surface-muted text-gray-600 hover:bg-surface-muted/80'}`}>
+          全部 ({total})
         </button>
         {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => handleCategoryChange(cat)}
+          <button key={cat} onClick={() => handleCategoryChange(cat)}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               selectedCategory === cat
                 ? 'bg-primary-600 text-white shadow-sm'
-                : 'bg-surface-muted text-gray-600 hover:bg-surface-muted/80'
-            }`}
-          >
+                : 'bg-surface-muted text-gray-600 hover:bg-surface-muted/80'}`}>
             {cat}
           </button>
         ))}
@@ -232,122 +312,53 @@ export default function VocabularyPage() {
           </div>
         ) : (
           <>
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  <th className="px-4 py-3">词汇</th>
-                  <th className="px-4 py-3">拼音</th>
-                  <th className="px-4 py-3">分类</th>
-                  <th className="px-4 py-3">词频</th>
-                  <th className="px-4 py-3 text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {items.map((item) => (
-                  <tr key={item.id} className="hover:bg-surface-muted transition-colors">
-                    <td className="px-4 py-3">
-                      <span className="font-semibold text-deep-800">{item.word}</span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{item.pinyin || '-'}</td>
-                    <td className="px-4 py-3">
-                      {item.category ? (
-                        <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-gray-600">
-                          {item.category}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{item.frequency}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <button
-                          onClick={() => openEdit(item)}
-                          className="rounded p-1.5 text-gray-400 hover:bg-surface-muted hover:text-primary-600"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
-              <span className="text-sm text-gray-500">
-                共 {total} 条 · 第 {page}/{totalPages} 页
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => goToPage(1)}
-                  disabled={page <= 1}
-                  title="首页"
-                  className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30"
-                >
-                  <ChevronsLeft className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => goToPage(page - 1)}
-                  disabled={page <= 1}
-                  title="上一页"
-                  className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((p) => {
-                    if (totalPages <= 7) return true;
-                    if (p === 1 || p === totalPages) return true;
-                    if (Math.abs(p - page) <= 1) return true;
-                    return false;
-                  })
-                  .map((p, idx, arr) => {
-                    const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
-                    return (
-                      <span key={p} className="contents">
-                        {showEllipsis && (
-                          <span className="px-1 text-sm text-gray-400">…</span>
-                        )}
-                        <button
-                          onClick={() => goToPage(p)}
-                          className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${
-                            p === page
-                              ? 'bg-primary-600 text-white'
-                              : 'text-gray-600 hover:bg-surface-muted'
-                          }`}
-                        >
-                          {p}
-                        </button>
+            {selectedCategory === '' && groupedItems.length > 1 ? (
+              /* 全部模式：按类型分组展示 */
+              <div>
+                {groupedItems.map((group) => (
+                  <div key={group.name}>
+                    <div className="border-b border-gray-100 bg-surface-muted/50 px-4 py-2.5">
+                      <span className="text-sm font-semibold text-deep-700">
+                        {group.name}
                       </span>
-                    );
-                  })}
-
-                <button
-                  onClick={() => goToPage(page + 1)}
-                  disabled={page >= totalPages}
-                  title="下一页"
-                  className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => goToPage(totalPages)}
-                  disabled={page >= totalPages}
-                  title="尾页"
-                  className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30"
-                >
-                  <ChevronsRight className="h-4 w-4" />
-                </button>
+                      <span className="ml-2 text-xs text-gray-500">
+                        ({group.items.length} 项)
+                      </span>
+                    </div>
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          <th className="px-4 py-2.5">词汇</th>
+                          <th className="px-4 py-2.5">拼音</th>
+                          <th className="px-4 py-2.5">词频</th>
+                          <th className="px-4 py-2.5 text-right">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {group.items.map(renderItemRow)}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
               </div>
-            </div>
+            ) : (
+              /* 单一分类模式：标准表格 */
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-3">词汇</th>
+                    <th className="px-4 py-3">拼音</th>
+                    <th className="px-4 py-3">分类</th>
+                    <th className="px-4 py-3">词频</th>
+                    <th className="px-4 py-3 text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {items.map(renderItemRow)}
+                </tbody>
+              </table>
+            )}
+            {renderPagination()}
           </>
         )}
       </div>
@@ -366,30 +377,21 @@ export default function VocabularyPage() {
             <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-deep-700">词汇 *</label>
-                <input
-                  className="input w-full"
-                  value={form.word}
+                <input className="input w-full" value={form.word}
                   onChange={(e) => setForm({ ...form, word: e.target.value })}
-                  placeholder="例如: 微服务架构"
-                />
+                  placeholder="例如: 微服务架构" />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-deep-700">拼音</label>
-                <input
-                  className="input w-full"
-                  value={form.pinyin}
+                <input className="input w-full" value={form.pinyin}
                   onChange={(e) => setForm({ ...form, pinyin: e.target.value })}
-                  placeholder="例如: wei fu wu jia gou"
-                />
+                  placeholder="例如: wei fu wu jia gou" />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-deep-700">分类</label>
-                <input
-                  className="input w-full"
-                  value={form.category}
+                <input className="input w-full" value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="例如: 技术术语"
-                />
+                  placeholder="例如: 日常用语 / 技术术语" />
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-2">

@@ -146,7 +146,7 @@ class VocabularyServiceImplTest {
                     setRecords(List.of(sampleVocab));
                 }});
 
-        VocabListResponse result = vocabularyService.listByUser(100L, 1, 10);
+        VocabListResponse result = vocabularyService.listByUser(100L, 1, 10, null);
 
         assertNotNull(result);
         assertEquals(1, result.getItems().size());
@@ -160,7 +160,7 @@ class VocabularyServiceImplTest {
                     setRecords(List.of(sampleVocab));
                 }});
 
-        VocabListResponse result = vocabularyService.search(100L, "智能", 1, 10);
+        VocabListResponse result = vocabularyService.search(100L, "智能", 1, 10, null);
 
         assertNotNull(result);
         assertEquals(1, result.getItems().size());
