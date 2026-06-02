@@ -346,8 +346,8 @@ fun main() = application {
             onCloseRequest = { stopAsrPipeline() },
             title = "HeecoMou Voice",
             state = rememberWindowState(
-                width = 360.dp,
-                height = 240.dp,
+                width = 380.dp,
+                height = 340.dp,
                 position = WindowPosition(Alignment.Center)
             ),
             alwaysOnTop = true,
@@ -384,8 +384,8 @@ fun main() = application {
             onCloseRequest = { },
             title = "HeecoMou - 登录",
             state = rememberWindowState(
-                width = 420.dp,
-                height = 480.dp,
+                width = 460.dp,
+                height = 600.dp,
                 position = WindowPosition(Alignment.Center)
             ),
             resizable = false
@@ -415,7 +415,7 @@ fun main() = application {
         Window(
             onCloseRequest = { isMainWindowVisible = false },
             title = "HeecoMou Desktop",
-            state = rememberWindowState(width = 560.dp, height = 620.dp)
+            state = rememberWindowState(width = 600.dp, height = 680.dp)
         ) {
             MaterialTheme {
                 Box(modifier = Modifier.fillMaxSize().background(mainBg)) {
