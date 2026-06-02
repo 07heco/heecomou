@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from src.inference.onnx_engine import WhisperOnnxEngine  # noqa: E402
 from src.nlp.vocab_injector import VocabInjector  # noqa: E402
+from src.nlp.context_corrector import ContextCorrector  # noqa: E402
 
 MODEL_DIR_DEFAULT = os.environ.get(
     "ONNX_MODEL_DIR",
@@ -28,6 +29,7 @@ app = FastAPI(title="HeecoMou Local ONNX ASR", version="1.0.0")
 
 engine: WhisperOnnxEngine = None
 vocab_injector: VocabInjector = None
+context_corrector: ContextCorrector = None
 
 
 class RecognizeRequest(BaseModel):
@@ -44,12 +46,13 @@ class RecognizeResponse(BaseModel):
 
 @app.on_event("startup")
 def startup():
-    global engine, vocab_injector
+    global engine, vocab_injector, context_corrector
     model_dir = os.environ.get("ONNX_MODEL_DIR", MODEL_DIR_DEFAULT)
     logger.info("Starting local ONNX ASR server, model_dir=%s", model_dir)
     engine = WhisperOnnxEngine(model_dir=model_dir)
     engine.load()
     vocab_injector = VocabInjector(backend_url=BACKEND_URL)
+    context_corrector = ContextCorrector()
     logger.info("Server ready (vocab_injector backend=%s)", BACKEND_URL)
 
 
@@ -83,6 +86,12 @@ def recognize(req: RecognizeRequest):
                 logger.info("Vocab injection applied, words=%d", len(words))
             except Exception:
                 logger.exception("Vocab injection failed, using raw text")
+
+        if context_corrector is not None:
+            try:
+                text = context_corrector.correct(text, vocab_words=req.vocab_words)
+            except Exception:
+                logger.exception("Context correction failed, using previous text")
 
         return RecognizeResponse(text=text, duration_ms=result.duration_ms)
     except Exception as e:

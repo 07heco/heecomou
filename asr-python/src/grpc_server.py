@@ -7,6 +7,7 @@ import grpc
 from inference.engine import ASREngine
 from nlp.punctuator import restore_punctuation
 from nlp.vocab_injector import VocabInjector
+from nlp.context_corrector import ContextCorrector
 from asr_grpc.asr_service_pb2 import (
     RecognitionResult,
     HealthResponse,
@@ -20,9 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 class ASRServicer(ASRServiceServicer):
-    def __init__(self, engine: ASREngine, vocab_injector: VocabInjector = None):
+    def __init__(self, engine: ASREngine, vocab_injector: VocabInjector = None, context_corrector: ContextCorrector = None):
         self.engine = engine
         self.vocab_injector = vocab_injector
+        self.context_corrector = context_corrector
 
     def StreamingRecognize(self, request_iterator, context):
         pcm_buffer = bytearray()
@@ -66,6 +68,17 @@ class ASRServicer(ASRServiceServicer):
                 except Exception:
                     pass
 
+            if self.context_corrector is not None:
+                try:
+                    metadata = dict(context.invocation_metadata())
+                    vocab_str = metadata.get("x-vocab-words")
+                    vocab_words = vocab_str.split(",") if vocab_str else []
+                    final_text = self.context_corrector.correct(
+                        final_text, vocab_words=vocab_words
+                    )
+                except Exception:
+                    pass
+
             yield RecognitionResult(
                 text=final_text,
                 is_final=True,
@@ -99,10 +112,11 @@ class ASRServicer(ASRServiceServicer):
 
 
 def create_server(engine: ASREngine, vocab_injector: VocabInjector = None, port: int = 50051, max_workers: int = 10):
+    context_corrector = ContextCorrector()
     server = grpc.server(
         thread_pool=None,
         maximum_concurrent_rpcs=max_workers,
     )
-    add_ASRServiceServicer_to_server(ASRServicer(engine, vocab_injector), server)
+    add_ASRServiceServicer_to_server(ASRServicer(engine, vocab_injector, context_corrector), server)
     server.add_insecure_port(f"0.0.0.0:{port}")
     return server

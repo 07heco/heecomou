@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from inference.engine import ASREngine
 from nlp.vocab_injector import VocabInjector
+from nlp.context_corrector import ContextCorrector
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,6 +22,7 @@ engine = ASREngine(model_id=model_id)
 
 backend_url = os.getenv("BACKEND_URL", "http://localhost:8081")
 vocab_injector = VocabInjector(backend_url=backend_url)
+context_corrector = ContextCorrector()
 
 
 @asynccontextmanager
@@ -104,6 +106,11 @@ async def recognize(req: RecognizeRequest):
                 text = vocab_injector.inject(text, vocab_words=words, user_id=req.user_id)
             except Exception:
                 logger.exception("Vocab injection failed, using raw text")
+
+        try:
+            text = context_corrector.correct(text, vocab_words=req.vocab_words)
+        except Exception:
+            logger.exception("Context correction failed, using previous text")
 
         return RecognizeResponse(
             text=text,
