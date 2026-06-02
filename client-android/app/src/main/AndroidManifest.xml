@@ -9,7 +9,9 @@
         android:allowBackup="true"
         android:label="HeecoMou"
         android:supportsRtl="true"
-        android:theme="@style/Theme.HeecoMou">
+        android:theme="@style/Theme.HeecoMou"
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config">
 
         <activity
             android:name=".ui.splash.SplashActivity"
