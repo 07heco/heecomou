@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Edit2, Trash2, RefreshCw, X } from 'lucide-react';
+import {
+  Search, Plus, Edit2, Trash2, RefreshCw, X,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+} from 'lucide-react';
 import { vocabApi } from '@/api/client';
 import type { VocabVO, VocabRequest } from '@/types/api';
 
@@ -10,6 +13,7 @@ interface VocabFormData {
 }
 
 const initialForm: VocabFormData = { word: '', pinyin: '', category: '' };
+const PAGE_SIZE = 10;
 
 export default function VocabularyPage() {
   const [items, setItems] = useState<VocabVO[]>([]);
@@ -21,31 +25,62 @@ export default function VocabularyPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<VocabFormData>(initialForm);
   const [message, setMessage] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
 
-  const fetchList = useCallback(async (p = page, kw = keyword) => {
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const fetchList = useCallback(async (
+    p: number,
+    kw: string,
+    cat: string,
+  ) => {
     setLoading(true);
     try {
+      const c = cat || undefined;
       const res = kw
-        ? await vocabApi.search(kw, p, 20)
-        : await vocabApi.list(p, 20);
+        ? await vocabApi.search(kw, p, PAGE_SIZE, c)
+        : await vocabApi.list(p, PAGE_SIZE, c);
       if (res.data.code === 200) {
         setItems(res.data.data.items);
         setTotal(res.data.data.total);
       }
-    } catch (err) {
+    } catch {
       setMessage('加载失败');
     } finally {
       setLoading(false);
     }
-  }, [page, keyword]);
+  }, []);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await vocabApi.categories();
+      if (res.data.code === 200) {
+        setCategories(res.data.data);
+      }
+    } catch {
+      setCategories([]);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchList();
-  }, [fetchList]);
+    fetchCategories();
+  }, [fetchCategories]);
+
+  useEffect(() => {
+    fetchList(page, keyword, selectedCategory);
+  }, [page, keyword, selectedCategory, fetchList]);
 
   const handleSearch = () => {
     setPage(1);
-    fetchList(1, keyword);
+    fetchList(1, keyword, selectedCategory);
+  };
+
+  const handleCategoryChange = (cat: string) => {
+    setSelectedCategory(cat);
+    setPage(1);
+    setKeyword('');
+    fetchList(1, '', cat);
   };
 
   const openAdd = () => {
@@ -83,8 +118,9 @@ export default function VocabularyPage() {
         setMessage('添加成功');
       }
       setShowForm(false);
-      fetchList();
-    } catch (err) {
+      fetchCategories();
+      fetchList(page, keyword, selectedCategory);
+    } catch {
       setMessage('操作失败');
     }
   };
@@ -94,8 +130,15 @@ export default function VocabularyPage() {
     try {
       await vocabApi.delete(id);
       setMessage('删除成功');
-      fetchList();
-    } catch (err) {
+      fetchCategories();
+      const newTotal = total - 1;
+      const newTotalPages = Math.max(1, Math.ceil(newTotal / PAGE_SIZE));
+      if (page > newTotalPages) {
+        setPage(newTotalPages);
+      } else {
+        fetchList(page, keyword, selectedCategory);
+      }
+    } catch {
       setMessage('删除失败');
     }
   };
@@ -105,14 +148,17 @@ export default function VocabularyPage() {
       const res = await vocabApi.sync({ version: 0, limit: 500 });
       if (res.data.code === 200) {
         setMessage(`同步完成 (${res.data.data.items.length} 项)`);
-        fetchList();
+        fetchCategories();
+        fetchList(page, keyword, selectedCategory);
       }
-    } catch (err) {
+    } catch {
       setMessage('同步失败');
     }
   };
 
-  const totalPages = Math.ceil(total / 20);
+  const goToPage = (p: number) => {
+    if (p >= 1 && p <= totalPages) setPage(p);
+  };
 
   return (
     <div className="animate-fade-in">
@@ -146,6 +192,32 @@ export default function VocabularyPage() {
         <button onClick={handleSearch} className="btn-secondary flex items-center gap-1.5">
           <Search className="h-4 w-4" /> 搜索
         </button>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          onClick={() => handleCategoryChange('')}
+          className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+            selectedCategory === ''
+              ? 'bg-primary-600 text-white shadow-sm'
+              : 'bg-surface-muted text-gray-600 hover:bg-surface-muted/80'
+          }`}
+        >
+          全部
+        </button>
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => handleCategoryChange(cat)}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              selectedCategory === cat
+                ? 'bg-primary-600 text-white shadow-sm'
+                : 'bg-surface-muted text-gray-600 hover:bg-surface-muted/80'
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
       </div>
 
       <div className="card overflow-hidden">
@@ -208,30 +280,74 @@ export default function VocabularyPage() {
               </tbody>
             </table>
 
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
-                <span className="text-sm text-gray-500">共 {total} 条</span>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page <= 1}
-                    className="rounded px-3 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30"
-                  >
-                    上一页
-                  </button>
-                  <span className="flex items-center px-3 py-1.5 text-sm font-medium text-deep-800">
-                    {page} / {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages}
-                    className="rounded px-3 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30"
-                  >
-                    下一页
-                  </button>
-                </div>
+            <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
+              <span className="text-sm text-gray-500">
+                共 {total} 条 · 第 {page}/{totalPages} 页
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => goToPage(1)}
+                  disabled={page <= 1}
+                  title="首页"
+                  className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page <= 1}
+                  title="上一页"
+                  className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => {
+                    if (totalPages <= 7) return true;
+                    if (p === 1 || p === totalPages) return true;
+                    if (Math.abs(p - page) <= 1) return true;
+                    return false;
+                  })
+                  .map((p, idx, arr) => {
+                    const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                    return (
+                      <span key={p} className="contents">
+                        {showEllipsis && (
+                          <span className="px-1 text-sm text-gray-400">…</span>
+                        )}
+                        <button
+                          onClick={() => goToPage(p)}
+                          className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${
+                            p === page
+                              ? 'bg-primary-600 text-white'
+                              : 'text-gray-600 hover:bg-surface-muted'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </span>
+                    );
+                  })}
+
+                <button
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page >= totalPages}
+                  title="下一页"
+                  className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => goToPage(totalPages)}
+                  disabled={page >= totalPages}
+                  title="尾页"
+                  className="rounded px-2 py-1.5 text-sm text-gray-600 hover:bg-surface-muted disabled:opacity-30"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </button>
               </div>
-            )}
+            </div>
           </>
         )}
       </div>

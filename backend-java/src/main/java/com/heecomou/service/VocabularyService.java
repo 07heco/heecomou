@@ -6,6 +6,8 @@ import com.heecomou.model.dto.VocabListResponse;
 import com.heecomou.model.dto.VocabRequest;
 import com.heecomou.model.vo.VocabularyVO;
 
+import java.util.List;
+
 public interface VocabularyService {
 
     VocabularyVO add(Long userId, VocabRequest request);
@@ -14,11 +16,13 @@ public interface VocabularyService {
 
     void delete(Long userId, Long vocabId);
 
-    VocabListResponse listByUser(Long userId, int page, int size);
+    VocabListResponse listByUser(Long userId, int page, int size, String category);
 
-    VocabListResponse search(Long userId, String keyword, int page, int size);
+    VocabListResponse search(Long userId, String keyword, int page, int size, String category);
 
     VocabularyVO getById(Long userId, Long vocabId);
 
     VocabSyncResponse sync(Long userId, VocabSyncRequest request);
+
+    List<String> listCategories(Long userId);
 }

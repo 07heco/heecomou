@@ -133,13 +133,18 @@ export const userApi = {
 };
 
 export const vocabApi = {
-  list: (page = 1, size = 20) =>
-    api.get<ApiResponse<VocabListResponse>>('/vocabulary', { params: { page, size } }),
-
-  search: (keyword: string, page = 1, size = 20) =>
-    api.get<ApiResponse<VocabListResponse>>('/vocabulary/search', {
-      params: { keyword, page, size },
+  list: (page = 1, size = 10, category?: string) =>
+    api.get<ApiResponse<VocabListResponse>>('/vocabulary', {
+      params: { page, size, ...(category ? { category } : {}) },
     }),
+
+  search: (keyword: string, page = 1, size = 10, category?: string) =>
+    api.get<ApiResponse<VocabListResponse>>('/vocabulary/search', {
+      params: { keyword, page, size, ...(category ? { category } : {}) },
+    }),
+
+  categories: () =>
+    api.get<ApiResponse<string[]>>('/vocabulary/categories'),
 
   getById: (id: number) =>
     api.get<ApiResponse<VocabVO>>(`/vocabulary/${id}`),

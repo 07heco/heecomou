@@ -15,6 +15,7 @@ import com.heecomou.service.VocabularyService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class VocabularyServiceImpl implements VocabularyService {
@@ -76,9 +77,13 @@ public class VocabularyServiceImpl implements VocabularyService {
     }
 
     @Override
-    public VocabListResponse listByUser(Long userId, int page, int size) {
+    public VocabListResponse listByUser(Long userId, int page, int size, String category) {
         LambdaQueryWrapper<Vocabulary> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Vocabulary::getUserId, userId)
+        wrapper.eq(Vocabulary::getUserId, userId);
+        if (category != null && !category.isEmpty()) {
+            wrapper.eq(Vocabulary::getCategory, category);
+        }
+        wrapper.orderByAsc(Vocabulary::getCategory)
                .orderByDesc(Vocabulary::getFrequency)
                .orderByDesc(Vocabulary::getId);
 
@@ -93,12 +98,16 @@ public class VocabularyServiceImpl implements VocabularyService {
     }
 
     @Override
-    public VocabListResponse search(Long userId, String keyword, int page, int size) {
+    public VocabListResponse search(Long userId, String keyword, int page, int size, String category) {
         LambdaQueryWrapper<Vocabulary> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Vocabulary::getUserId, userId)
                .and(w -> w.like(Vocabulary::getWord, keyword)
                           .or()
-                          .like(Vocabulary::getPinyin, keyword))
+                          .like(Vocabulary::getPinyin, keyword));
+        if (category != null && !category.isEmpty()) {
+            wrapper.eq(Vocabulary::getCategory, category);
+        }
+        wrapper.orderByAsc(Vocabulary::getCategory)
                .orderByDesc(Vocabulary::getFrequency)
                .orderByDesc(Vocabulary::getId);
 
@@ -142,6 +151,21 @@ public class VocabularyServiceImpl implements VocabularyService {
                 page.get(page.size() - 1).getVersion();
 
         return new VocabSyncResponse(items, hasMore, maxVersion);
+    }
+
+    @Override
+    public List<String> listCategories(Long userId) {
+        LambdaQueryWrapper<Vocabulary> wrapper = new LambdaQueryWrapper<>();
+        wrapper.select(Vocabulary::getCategory)
+               .eq(Vocabulary::getUserId, userId)
+               .isNotNull(Vocabulary::getCategory)
+               .ne(Vocabulary::getCategory, "")
+               .groupBy(Vocabulary::getCategory)
+               .orderByAsc(Vocabulary::getCategory);
+
+        return vocabularyMapper.selectList(wrapper).stream()
+                .map(Vocabulary::getCategory)
+                .collect(Collectors.toList());
     }
 
     private void checkDuplicate(Long userId, String word) {

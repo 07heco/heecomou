@@ -11,6 +11,7 @@ import com.heecomou.security.JwtUtil;
 import com.heecomou.service.VocabularyService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -54,9 +55,10 @@ public class VocabularyController {
     @GetMapping
     public ApiResponse<VocabListResponse> list(HttpServletRequest request,
                                                 @RequestParam(defaultValue = "1") int page,
-                                                @RequestParam(defaultValue = "20") int size) {
+                                                @RequestParam(defaultValue = "10") int size,
+                                                @RequestParam(required = false) String category) {
         Long userId = extractUserId(request);
-        VocabListResponse resp = vocabularyService.listByUser(userId, page, size);
+        VocabListResponse resp = vocabularyService.listByUser(userId, page, size, category);
         return ApiResponse.success(resp);
     }
 
@@ -64,9 +66,10 @@ public class VocabularyController {
     public ApiResponse<VocabListResponse> search(HttpServletRequest request,
                                                   @RequestParam String keyword,
                                                   @RequestParam(defaultValue = "1") int page,
-                                                  @RequestParam(defaultValue = "20") int size) {
+                                                  @RequestParam(defaultValue = "10") int size,
+                                                  @RequestParam(required = false) String category) {
         Long userId = extractUserId(request);
-        VocabListResponse resp = vocabularyService.search(userId, keyword, page, size);
+        VocabListResponse resp = vocabularyService.search(userId, keyword, page, size, category);
         return ApiResponse.success(resp);
     }
 
@@ -76,6 +79,13 @@ public class VocabularyController {
         Long userId = extractUserId(request);
         VocabularyVO vo = vocabularyService.getById(userId, id);
         return ApiResponse.success(vo);
+    }
+
+    @GetMapping("/categories")
+    public ApiResponse<List<String>> categories(HttpServletRequest request) {
+        Long userId = extractUserId(request);
+        List<String> categories = vocabularyService.listCategories(userId);
+        return ApiResponse.success(categories);
     }
 
     @PostMapping("/sync")
